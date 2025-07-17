@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useUserRole } from "@/contexts/UserRoleContext"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
@@ -30,6 +31,10 @@ interface AppSidebarProps {
 
 export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
   const location = useLocation()
+  const { user, canAccess } = useUserRole()
+
+  // Filter navigation items based on user role
+  const filteredNavigation = navigation.filter(item => canAccess(item.href))
 
   return (
     <>
@@ -73,7 +78,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
 
         {/* Navigation */}
         <nav className="p-4 space-y-2">
-          {navigation.map((item) => {
+          {filteredNavigation.map((item) => {
             const isActive = location.pathname === item.href
             const Icon = item.icon
 
@@ -99,11 +104,11 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
           })}
         </nav>
 
-        {/* Farm info */}
+        {/* User info */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border bg-muted/30">
           <div className="text-center">
             <p className="text-sm font-medium text-foreground">Green Valley Farm</p>
-            <p className="text-xs text-muted-foreground">Manager: John Smith</p>
+            <p className="text-xs text-muted-foreground">{user?.role}: {user?.name}</p>
           </div>
         </div>
       </div>
