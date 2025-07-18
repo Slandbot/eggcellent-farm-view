@@ -50,13 +50,13 @@ export default function FeedInventory() {
   const totalValue = feedData.reduce((sum, item) => sum + (item.stock * 15), 0)
 
   return (
-    <div className="h-screen bg-background flex overflow-hidden">
+    <div className="mobile-safe bg-background flex">
       <AppSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col mobile-content">
         <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         
-        <main className="flex-1 responsive-container responsive-spacing overflow-y-auto">
+        <main className="flex-1 responsive-container responsive-spacing mobile-content">
           <div className="responsive-flex items-start sm:items-center justify-between mb-6">
             <div className="flex-1">
               <h1 className="responsive-title text-foreground">Feed Inventory</h1>

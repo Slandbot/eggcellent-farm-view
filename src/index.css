@@ -342,4 +342,23 @@
   .responsive-actions {
     @apply flex flex-col sm:flex-row gap-2 sm:gap-4 items-stretch sm:items-center;
   }
+
+  /* Mobile viewport fixes */
+  .mobile-safe {
+    @apply min-h-screen w-full overflow-x-hidden;
+  }
+
+  .mobile-content {
+    @apply w-full min-w-0 max-w-full;
+  }
+
+  /* Prevent horizontal overflow */
+  .no-overflow {
+    @apply overflow-x-hidden max-w-full;
+  }
+
+  /* Safe area for mobile devices */
+  .mobile-safe-area {
+    @apply pb-safe-area-inset-bottom pl-safe-area-inset-left pr-safe-area-inset-right;
+  }
 }
