@@ -1,19 +1,15 @@
-import { createContext, useContext, useState, ReactNode } from "react"
+import { createContext, useContext, useState, ReactNode, useEffect } from "react"
+import { User, UserRole, AuthState } from "@/types/auth"
+import { authService } from "@/services/authService"
 
-export type UserRole = "Admin" | "Farm Manager" | "Worker"
-
-interface User {
-  id: string
-  name: string
-  email: string
-  role: UserRole
-}
-
-interface UserRoleContextType {
-  user: User | null
-  setUser: (user: User | null) => void
+interface UserRoleContextType extends AuthState {
+  login: (email: string, password: string) => Promise<void>
+  register: (name: string, email: string, password: string, role: UserRole) => Promise<void>
+  logout: () => void
+  updateUser: (updates: Partial<User>) => Promise<void>
   hasPermission: (permission: string) => boolean
   canAccess: (page: string) => boolean
+  switchRole: (role: UserRole) => void
 }
 
 const UserRoleContext = createContext<UserRoleContextType | undefined>(undefined)
@@ -57,13 +53,53 @@ const pageAccess: Record<UserRole, string[]> = {
 }
 
 export function UserRoleProvider({ children }: { children: ReactNode }) {
-  // Default user for demo - in real app this would come from authentication
-  const [user, setUser] = useState<User | null>({
-    id: "1",
-    name: "John Smith", 
-    email: "john@farm.com",
-    role: "Farm Manager"
-  })
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    // Check for existing session on mount
+    const currentUser = authService.getCurrentUser()
+    setUser(currentUser)
+    setIsLoading(false)
+  }, [])
+
+  const login = async (email: string, password: string): Promise<void> => {
+    setIsLoading(true)
+    try {
+      const loggedInUser = await authService.login({ email, password })
+      setUser(loggedInUser)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const register = async (name: string, email: string, password: string, role: UserRole): Promise<void> => {
+    setIsLoading(true)
+    try {
+      const newUser = await authService.register({ name, email, password, role })
+      setUser(newUser)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const logout = (): void => {
+    authService.logout()
+    setUser(null)
+  }
+
+  const updateUser = async (updates: Partial<User>): Promise<void> => {
+    if (!user) return
+    const updatedUser = await authService.updateUser(updates)
+    setUser(updatedUser)
+  }
+
+  const switchRole = (role: UserRole): void => {
+    authService.switchRole(role)
+    if (user) {
+      setUser({ ...user, role })
+    }
+  }
 
   const hasPermission = (permission: string): boolean => {
     if (!user) return false
@@ -75,8 +111,21 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
     return pageAccess[user.role]?.includes(page) || false
   }
 
+  const isAuthenticated = !!user
+
   return (
-    <UserRoleContext.Provider value={{ user, setUser, hasPermission, canAccess }}>
+    <UserRoleContext.Provider value={{ 
+      user, 
+      isAuthenticated,
+      isLoading,
+      login, 
+      register,
+      logout, 
+      updateUser,
+      hasPermission, 
+      canAccess,
+      switchRole
+    }}>
       {children}
     </UserRoleContext.Provider>
   )

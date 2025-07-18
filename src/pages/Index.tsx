@@ -17,17 +17,17 @@ const Index = () => {
       <div className="flex-1 flex flex-col lg:ml-0">
         <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         
-        <main className="flex-1 p-6 space-y-6">
+        <main className="flex-1 responsive-padding space-y-4 sm:space-y-6">
           {/* Page title */}
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Farm Dashboard</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="responsive-heading font-bold text-foreground">Farm Dashboard</h1>
+            <p className="text-muted-foreground mt-1 responsive-text">
               Monitor your poultry farm operations and key metrics
             </p>
           </div>
 
           {/* Metrics grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="responsive-grid lg-4">
             <MetricCard
               title="Total Birds"
               value="12,547"
@@ -55,17 +55,17 @@ const Index = () => {
           </div>
 
           {/* Charts and actions */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
+          <div className="responsive-grid lg-3 lg:gap-6">
+            <div className="lg:col-span-2 order-2 lg:order-1">
               <ProductionChart />
             </div>
-            <div>
+            <div className="order-1 lg:order-2">
               <QuickActions />
             </div>
           </div>
 
           {/* Activity feed */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="responsive-grid md-2">
             <RecentActivity />
             
             {/* Performance overview */}

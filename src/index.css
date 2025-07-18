@@ -141,7 +141,7 @@
 @layer components {
   /* Agricultural Dashboard Components */
   .metric-card {
-    @apply bg-card rounded-[var(--radius)] p-6 shadow-[var(--shadow-card)] border border-border;
+    @apply bg-card rounded-[var(--radius)] p-4 sm:p-6 shadow-[var(--shadow-card)] border border-border;
     @apply hover:shadow-[var(--shadow-soft)] transition-[var(--transition-smooth)];
   }
 
@@ -150,15 +150,15 @@
   }
 
   .metric-value {
-    @apply text-3xl font-bold text-foreground;
+    @apply text-2xl sm:text-3xl font-bold text-foreground;
   }
 
   .metric-label {
-    @apply text-sm font-medium text-muted-foreground uppercase tracking-wide;
+    @apply text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide;
   }
 
   .status-badge {
-    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+    @apply inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium;
   }
 
   .status-badge.success {
@@ -174,7 +174,7 @@
   }
 
   .sidebar-nav-item {
-    @apply flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-[var(--transition-smooth)];
+    @apply flex items-center px-3 sm:px-4 py-2 sm:py-3 text-sm font-medium rounded-lg transition-[var(--transition-smooth)];
     @apply hover:bg-secondary text-foreground;
   }
 
@@ -183,16 +183,45 @@
   }
 
   .page-header {
-    @apply flex items-center justify-between p-6 bg-card border-b border-border shadow-[var(--shadow-header)];
+    @apply flex items-center justify-between p-4 sm:p-6 bg-card border-b border-border shadow-[var(--shadow-header)];
   }
 
   .action-button {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-[var(--transition-bounce)];
+    @apply inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg font-medium transition-[var(--transition-bounce)];
     @apply bg-primary text-primary-foreground hover:bg-primary-glow shadow-sm;
     @apply hover:scale-105 active:scale-95;
   }
 
   .chart-container {
-    @apply bg-card rounded-[var(--radius)] p-6 border border-border shadow-[var(--shadow-card)];
+    @apply bg-card rounded-[var(--radius)] p-4 sm:p-6 border border-border shadow-[var(--shadow-card)];
+  }
+
+  /* Mobile-first responsive utilities */
+  .responsive-grid {
+    @apply grid grid-cols-1 gap-4 sm:gap-6;
+  }
+
+  .responsive-grid.md-2 {
+    @apply md:grid-cols-2;
+  }
+
+  .responsive-grid.lg-3 {
+    @apply lg:grid-cols-3;
+  }
+
+  .responsive-grid.lg-4 {
+    @apply lg:grid-cols-4;
+  }
+
+  .responsive-padding {
+    @apply p-4 sm:p-6 lg:p-8;
+  }
+
+  .responsive-text {
+    @apply text-sm sm:text-base;
+  }
+
+  .responsive-heading {
+    @apply text-2xl sm:text-3xl lg:text-4xl;
   }
 }

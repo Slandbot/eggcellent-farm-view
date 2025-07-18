@@ -1,7 +1,11 @@
-import { Menu, Bell, Search, User } from "lucide-react"
+import { Menu, Bell, Search, User, LogOut, Settings, Users, Shield } from "lucide-react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useUserRole } from "@/contexts/UserRoleContext"
+import { UserRole } from "@/types/auth"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +20,14 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ onMenuToggle }: AppHeaderProps) {
+  const [searchValue, setSearchValue] = useState("")
+  const { user, logout, switchRole, hasPermission } = useUserRole()
+
+  const handleRoleSwitch = (role: UserRole) => {
+    switchRole(role)
+    window.location.reload() // Refresh to update permissions
+  }
+
   return (
     <header className="page-header lg:pl-0">
       <div className="flex items-center gap-4">
@@ -34,6 +46,8 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search farm data..."
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
             className="pl-10 w-64 bg-muted/50 border-border"
           />
         </div>
@@ -51,21 +65,61 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-primary" />
-              </div>
-              <span className="hidden sm:block text-sm font-medium">John Smith</span>
+            <Button variant="ghost" size="sm" className="gap-2">
+              <Avatar className="w-8 h-8">
+                <AvatarImage src={user?.avatar} alt={user?.name} />
+                <AvatarFallback>
+                  {user?.name?.split(" ").map(n => n[0]).join("") || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <span className="hidden md:inline text-sm">{user?.name}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              <div>
+                <p className="font-medium">{user?.name}</p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
+                <Badge variant="secondary" className="text-xs mt-1">
+                  {user?.role}
+                </Badge>
+              </div>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile Settings</DropdownMenuItem>
-            <DropdownMenuItem>Farm Settings</DropdownMenuItem>
-            <DropdownMenuItem>Help & Support</DropdownMenuItem>
+            <DropdownMenuItem>
+              <User className="w-4 h-4 mr-2" />
+              Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Settings className="w-4 h-4 mr-2" />
+              Settings
+            </DropdownMenuItem>
+            
+            {/* Role switching for demo purposes */}
+            {hasPermission("manage_users") && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs">Switch Role (Demo)</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => handleRoleSwitch("Admin")}>
+                  <Shield className="w-4 h-4 mr-2" />
+                  Admin
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleRoleSwitch("Farm Manager")}>
+                  <Users className="w-4 h-4 mr-2" />
+                  Farm Manager
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleRoleSwitch("Worker")}>
+                  <User className="w-4 h-4 mr-2" />
+                  Worker
+                </DropdownMenuItem>
+              </>
+            )}
+            
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">Sign Out</DropdownMenuItem>
+            <DropdownMenuItem onClick={logout} className="text-destructive">
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
