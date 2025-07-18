@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ProductionChart } from "@/components/dashboard/ProductionChart"
 import { Plus, Search, Egg, TrendingUp, Calendar, Scale } from "lucide-react"
 
@@ -19,6 +22,17 @@ const collectionData = [
 
 export default function EggCollection() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [recordCollectionDialogOpen, setRecordCollectionDialogOpen] = useState(false)
+  const [newCollection, setNewCollection] = useState({
+    date: new Date().toISOString().split('T')[0],
+    shift: "",
+    pen: "",
+    quantity: "",
+    grade: "",
+    avgWeight: "",
+    collector: "",
+    notes: ""
+  })
 
   const getGradeColor = (grade: string) => {
     switch (grade) {
@@ -38,19 +52,19 @@ export default function EggCollection() {
   const weeklyTotal = 4850
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="h-screen bg-background flex overflow-hidden">
       <AppSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       
       <div className="flex-1 flex flex-col">
         <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         
-        <main className="flex-1 p-6 space-y-6">
+        <main className="flex-1 p-6 space-y-6 overflow-y-auto">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-foreground">Egg Collection</h1>
               <p className="text-muted-foreground">Track daily egg collection and quality grading</p>
             </div>
-            <Button className="gap-2">
+            <Button className="gap-2" onClick={() => setRecordCollectionDialogOpen(true)}>
               <Plus className="w-4 h-4" />
               Record Collection
             </Button>
@@ -166,6 +180,159 @@ export default function EggCollection() {
           </Card>
         </main>
       </div>
+
+      {/* Record Collection Dialog */}
+      <Dialog open={recordCollectionDialogOpen} onOpenChange={setRecordCollectionDialogOpen}>
+        <DialogContent className="w-[95vw] max-w-[425px] max-h-[90vh] overflow-y-auto mx-2 sm:mx-auto">
+          <DialogHeader className="space-y-2 pb-4">
+            <DialogTitle className="text-lg sm:text-xl">Record Egg Collection</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Record a new egg collection entry. Fill in all the required details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="date" className="text-sm font-medium">
+                  Collection Date *
+                </Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={newCollection.date}
+                  onChange={(e) => setNewCollection({...newCollection, date: e.target.value})}
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="shift" className="text-sm font-medium">
+                  Shift *
+                </Label>
+                <Select value={newCollection.shift} onValueChange={(value) => setNewCollection({...newCollection, shift: value})}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select shift" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Morning">Morning</SelectItem>
+                    <SelectItem value="Afternoon">Afternoon</SelectItem>
+                    <SelectItem value="Evening">Evening</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="pen" className="text-sm font-medium">
+                  Pen Location *
+                </Label>
+                <Input
+                  id="pen"
+                  value={newCollection.pen}
+                  onChange={(e) => setNewCollection({...newCollection, pen: e.target.value})}
+                  placeholder="e.g., A1, B2, C3"
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quantity" className="text-sm font-medium">
+                  Quantity *
+                </Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  value={newCollection.quantity}
+                  onChange={(e) => setNewCollection({...newCollection, quantity: e.target.value})}
+                  placeholder="150"
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="grade" className="text-sm font-medium">
+                  Egg Grade *
+                </Label>
+                <Select value={newCollection.grade} onValueChange={(value) => setNewCollection({...newCollection, grade: value})}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select grade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AA">Grade AA</SelectItem>
+                    <SelectItem value="A">Grade A</SelectItem>
+                    <SelectItem value="B">Grade B</SelectItem>
+                    <SelectItem value="C">Grade C</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="avgWeight" className="text-sm font-medium">
+                  Avg Weight
+                </Label>
+                <Input
+                  id="avgWeight"
+                  value={newCollection.avgWeight}
+                  onChange={(e) => setNewCollection({...newCollection, avgWeight: e.target.value})}
+                  placeholder="e.g., 58g avg"
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="collector" className="text-sm font-medium">
+                Collector Name
+              </Label>
+              <Input
+                id="collector"
+                value={newCollection.collector}
+                onChange={(e) => setNewCollection({...newCollection, collector: e.target.value})}
+                placeholder="e.g., John Doe"
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes" className="text-sm font-medium">
+                Additional Notes
+              </Label>
+              <Input
+                id="notes"
+                value={newCollection.notes}
+                onChange={(e) => setNewCollection({...newCollection, notes: e.target.value})}
+                placeholder="Additional notes (optional)"
+                className="w-full"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t">
+            <Button 
+              variant="outline" 
+              onClick={() => setRecordCollectionDialogOpen(false)} 
+              className="w-full sm:w-auto order-2 sm:order-1"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                // Here you would typically save the data
+                console.log('Recording collection:', newCollection)
+                setRecordCollectionDialogOpen(false)
+                setNewCollection({
+                  date: new Date().toISOString().split('T')[0],
+                  shift: "",
+                  pen: "",
+                  quantity: "",
+                  grade: "",
+                  avgWeight: "",
+                  collector: "",
+                  notes: ""
+                })
+              }}
+              className="w-full sm:w-auto order-1 sm:order-2"
+            >
+              Record Collection
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

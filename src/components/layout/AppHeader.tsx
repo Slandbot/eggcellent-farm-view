@@ -1,5 +1,6 @@
 import { Menu, Bell, Search, User, LogOut, Settings, Users, Shield } from "lucide-react"
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -21,6 +22,7 @@ interface AppHeaderProps {
 
 export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const [searchValue, setSearchValue] = useState("")
+  const navigate = useNavigate()
   const { user, logout, switchRole, hasPermission } = useUserRole()
 
   const handleRoleSwitch = (role: UserRole) => {
@@ -42,24 +44,29 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
         </Button>
 
         {/* Search */}
-        <div className="relative hidden sm:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <div className="relative hidden md:block">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Search farm data..."
+            placeholder="Search..."
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
-            className="pl-10 w-64 bg-muted/50 border-border"
+            className="pl-10 w-48 lg:w-64 bg-background/50 backdrop-blur-sm border-border/50"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
+        {/* Mobile search button */}
+        <Button variant="ghost" size="icon" className="relative md:hidden">
+          <Search className="w-5 h-5" />
+        </Button>
+        
         {/* Notifications */}
-        <Button variant="ghost" size="sm" className="relative">
-          <Bell className="w-5 h-5" />
-          <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-warning text-xs">
+        <Button variant="ghost" size="icon" className="relative">
+          <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+          <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-[10px] flex items-center justify-center text-white">
             3
-          </Badge>
+          </span>
         </Button>
 
         {/* User menu */}
@@ -86,7 +93,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/profile')}>
               <User className="w-4 h-4 mr-2" />
               Profile
             </DropdownMenuItem>

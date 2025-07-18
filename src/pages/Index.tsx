@@ -11,23 +11,22 @@ const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen bg-background flex overflow-hidden">
       <AppSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       
       <div className="flex-1 flex flex-col lg:ml-0">
         <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         
-        <main className="flex-1 responsive-padding space-y-4 sm:space-y-6">
-          {/* Page title */}
-          <div>
-            <h1 className="responsive-heading font-bold text-foreground">Farm Dashboard</h1>
-            <p className="text-muted-foreground mt-1 responsive-text">
-              Monitor your poultry farm operations and key metrics
-            </p>
+        <main className="flex-1 responsive-container responsive-spacing overflow-y-auto">
+          <div className="responsive-flex items-start sm:items-center justify-between mb-6">
+            <div className="flex-1">
+              <h1 className="responsive-title text-foreground">Farm Dashboard</h1>
+              <p className="responsive-subtitle">Monitor your poultry farm operations and key metrics</p>
+            </div>
           </div>
 
-          {/* Metrics grid */}
-          <div className="responsive-grid lg-4">
+          {/* Metric Cards */}
+          <div className="responsive-card-grid mb-8">
             <MetricCard
               title="Total Birds"
               value="12,547"
@@ -55,11 +54,19 @@ const Index = () => {
           </div>
 
           {/* Charts and actions */}
-          <div className="responsive-grid lg-3 lg:gap-6">
-            <div className="lg:col-span-2 order-2 lg:order-1">
+          <div className="responsive-chart-grid">
+            <div className="chart-container">
+              <div className="responsive-card-content mb-6">
+                <h3 className="text-lg sm:text-xl font-semibold text-foreground">Production Trends</h3>
+                <p className="responsive-subtitle">Egg production over the last 7 days</p>
+              </div>
               <ProductionChart />
             </div>
-            <div className="order-1 lg:order-2">
+            <div className="chart-container">
+              <div className="responsive-card-content mb-6">
+                <h3 className="text-lg sm:text-xl font-semibold text-foreground">Quick Actions</h3>
+                <p className="responsive-subtitle">Common farm management tasks</p>
+              </div>
               <QuickActions />
             </div>
           </div>

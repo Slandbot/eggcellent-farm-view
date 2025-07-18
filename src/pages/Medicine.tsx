@@ -45,13 +45,13 @@ export default function Medicine() {
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="h-screen bg-background flex overflow-hidden">
       <AppSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       
       <div className="flex-1 flex flex-col">
         <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         
-        <main className="flex-1 p-6 space-y-6">
+        <main className="flex-1 p-6 space-y-6 overflow-y-auto">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-foreground">Medicine & Vaccines</h1>

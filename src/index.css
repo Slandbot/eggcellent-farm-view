@@ -174,12 +174,35 @@
   }
 
   .sidebar-nav-item {
-    @apply flex items-center px-3 sm:px-4 py-2 sm:py-3 text-sm font-medium rounded-lg transition-[var(--transition-smooth)];
-    @apply hover:bg-secondary text-foreground;
+    @apply flex items-center px-3 sm:px-4 py-2 sm:py-3 text-sm font-medium rounded-lg transition-all duration-200;
+    @apply hover:bg-secondary text-foreground relative;
   }
 
   .sidebar-nav-item.active {
     @apply bg-primary text-primary-foreground shadow-sm;
+  }
+
+  /* Collapsed sidebar styles */
+  .sidebar-collapsed .sidebar-nav-item {
+    @apply justify-center p-3 w-12 h-12;
+  }
+
+  .sidebar-collapsed .sidebar-nav-item span {
+    @apply hidden;
+  }
+
+  /* Tooltip styles for collapsed sidebar */
+  .sidebar-tooltip {
+    @apply absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1;
+    @apply bg-popover text-popover-foreground text-sm rounded-md shadow-md;
+    @apply opacity-0 group-hover:opacity-100 transition-opacity duration-200;
+    @apply pointer-events-none whitespace-nowrap z-50 hidden lg:block;
+  }
+
+  .sidebar-tooltip::before {
+    content: '';
+    @apply absolute right-full top-1/2 -translate-y-1/2;
+    @apply border-4 border-transparent border-r-popover;
   }
 
   .page-header {
@@ -194,6 +217,7 @@
 
   .chart-container {
     @apply bg-card rounded-[var(--radius)] p-4 sm:p-6 border border-border shadow-[var(--shadow-card)];
+    @apply w-full overflow-hidden;
   }
 
   /* Mobile-first responsive utilities */
@@ -223,5 +247,99 @@
 
   .responsive-heading {
     @apply text-2xl sm:text-3xl lg:text-4xl;
+  }
+
+  /* Enhanced responsive utilities */
+  .responsive-container {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  .responsive-spacing {
+    @apply space-y-4 sm:space-y-6;
+  }
+
+  .responsive-flex {
+    @apply flex flex-col sm:flex-row gap-4;
+  }
+
+  .responsive-card-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4;
+  }
+
+  .responsive-chart-grid {
+    @apply grid grid-cols-1 lg:grid-cols-2 gap-6;
+  }
+
+  /* Mobile-first table styles */
+  .mobile-table {
+    @apply block sm:table w-full;
+  }
+
+  .mobile-table-row {
+    @apply block sm:table-row border-b sm:border-b-0 mb-4 sm:mb-0 p-4 sm:p-0 bg-card sm:bg-transparent rounded-lg sm:rounded-none;
+  }
+
+  .mobile-table-cell {
+    @apply block sm:table-cell text-left sm:text-left pb-2 sm:pb-0;
+  }
+
+  .mobile-table-cell:before {
+    content: attr(data-label) ": ";
+    @apply font-semibold sm:hidden;
+  }
+
+  .mobile-table-header {
+    @apply hidden sm:table-header-group;
+  }
+
+  /* Responsive button groups */
+  .responsive-button-group {
+    @apply flex flex-col sm:flex-row gap-2;
+  }
+
+  /* Responsive search and filters */
+  .responsive-filters {
+    @apply flex flex-col sm:flex-row gap-4 mb-6;
+  }
+
+  .responsive-search {
+    @apply w-full sm:flex-1;
+  }
+
+  .responsive-select {
+    @apply w-full sm:w-[180px];
+  }
+
+  /* Chart container responsiveness */
+  .chart-container {
+    @apply w-full;
+  }
+
+  .chart-container .recharts-wrapper {
+    @apply w-full;
+  }
+
+  /* Mobile navigation improvements */
+  .mobile-nav-item {
+    @apply block w-full text-left px-4 py-3 hover:bg-accent rounded-md;
+  }
+
+  /* Responsive typography */
+  .responsive-title {
+    @apply text-2xl sm:text-3xl font-bold tracking-tight;
+  }
+
+  .responsive-subtitle {
+    @apply text-sm sm:text-base text-muted-foreground;
+  }
+
+  /* Card content responsive spacing */
+  .responsive-card-content {
+    @apply p-4 sm:p-6;
+  }
+
+  /* Action buttons responsive layout */
+  .responsive-actions {
+    @apply flex flex-col sm:flex-row gap-2 sm:gap-4 items-stretch sm:items-center;
   }
 }

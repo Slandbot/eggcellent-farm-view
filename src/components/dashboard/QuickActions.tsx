@@ -59,7 +59,7 @@ export function QuickActions() {
         <p className="text-sm text-muted-foreground">Common daily tasks</p>
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {actions.map((action) => {
           const Icon = action.icon
           const hasAccess = hasPermission(action.permission)
@@ -68,33 +68,33 @@ export function QuickActions() {
             <Button
               key={action.label}
               variant={action.variant}
-              className={`h-auto p-4 flex-col items-start text-left justify-start gap-2 hover:scale-[1.02] transition-transform ${
+              className={`h-auto p-3 sm:p-4 flex-col items-start text-left justify-start gap-2 hover:scale-[1.02] transition-transform ${
                 !hasAccess ? "opacity-50 cursor-not-allowed" : ""
               }`}
               onClick={action.onClick}
               disabled={!hasAccess}
             >
-              <div className="flex items-center gap-3 w-full">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              <div className="flex items-center gap-2 sm:gap-3 w-full">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center ${
                   action.variant === 'default' 
                     ? 'bg-primary-foreground/20' 
                     : 'bg-primary/10'
                 }`}>
-                  <Icon className={`w-5 h-5 ${
+                  <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${
                     action.variant === 'default' 
                       ? 'text-primary-foreground' 
                       : 'text-primary'
                   }`} />
                 </div>
                 <div className="flex-1">
-                  <div className={`font-medium ${
+                  <div className={`font-medium text-sm sm:text-base ${
                     action.variant === 'default' 
                       ? 'text-primary-foreground' 
                       : 'text-foreground'
                   }`}>
                     {action.label}
                   </div>
-                  <div className={`text-xs ${
+                  <div className={`text-xs leading-tight ${
                     action.variant === 'default' 
                       ? 'text-primary-foreground/70' 
                       : 'text-muted-foreground'

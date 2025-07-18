@@ -12,15 +12,15 @@ const data = [
 
 export function ProductionChart() {
   return (
-    <div className="chart-container">
+    <div className="chart-container w-full">
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-foreground">Egg Production Trend</h3>
-        <p className="text-sm text-muted-foreground">Last 7 days performance</p>
+        <h3 className="text-base sm:text-lg font-semibold text-foreground">Egg Production Trend</h3>
+        <p className="text-xs sm:text-sm text-muted-foreground">Last 7 days performance</p>
       </div>
       
-      <div className="h-64">
+      <div className="h-48 sm:h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
               dataKey="day" 
@@ -59,7 +59,7 @@ export function ProductionChart() {
         </ResponsiveContainer>
       </div>
       
-      <div className="flex items-center gap-6 mt-4 text-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 mt-4 text-xs sm:text-sm">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-primary rounded-full"></div>
           <span className="text-muted-foreground">Actual Production</span>

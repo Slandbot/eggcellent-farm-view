@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { Bird } from "lucide-react"
 import { LoginForm } from "./LoginForm"
-import { RegisterForm } from "./RegisterForm"
 
 export function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
@@ -33,7 +32,7 @@ export function AuthPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          {/* <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="p-4 bg-card rounded-lg border border-border">
               <div className="font-semibold text-foreground">12,547+</div>
               <div className="text-muted-foreground">Birds Tracked</div>
@@ -42,16 +41,14 @@ export function AuthPage() {
               <div className="font-semibold text-foreground">2,847</div>
               <div className="text-muted-foreground">Daily Eggs</div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Right side - Auth Form */}
         <div className="flex justify-center">
           {isLogin ? (
             <LoginForm onToggleMode={() => setIsLogin(false)} />
-          ) : (
-            <RegisterForm onToggleMode={() => setIsLogin(true)} />
-          )}
+          ) : null}
         </div>
       </div>
     </div>

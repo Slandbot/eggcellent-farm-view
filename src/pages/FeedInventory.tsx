@@ -7,7 +7,10 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Progress } from "@/components/ui/progress"
-import { Plus, Search, Package, AlertTriangle, TrendingDown } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plus, Search, Package, AlertTriangle, TrendingDown, Truck } from "lucide-react"
 
 const feedData = [
   { id: "F001", name: "Layer Mash Premium", category: "Layer Feed", stock: 850, maxCapacity: 1000, unit: "kg", status: "In Stock", expiryDate: "2024-12-15" },
@@ -19,6 +22,17 @@ const feedData = [
 
 export default function FeedInventory() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [addFeedDialogOpen, setAddFeedDialogOpen] = useState(false)
+  const [newFeedItem, setNewFeedItem] = useState({
+    name: "",
+    type: "",
+    supplier: "",
+    quantity: "",
+    unit: "kg",
+    costPerUnit: "",
+    expiryDate: "",
+    location: ""
+  })
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -33,29 +47,29 @@ export default function FeedInventory() {
     return (stock / maxCapacity) * 100
   }
 
-  const totalValue = feedData.reduce((sum, item) => sum + (item.stock * 2.5), 0) // Assuming avg cost of $2.5/kg
+  const totalValue = feedData.reduce((sum, item) => sum + (item.stock * 15), 0)
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="h-screen bg-background flex overflow-hidden">
       <AppSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       
       <div className="flex-1 flex flex-col">
         <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         
-        <main className="flex-1 p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">Feed Inventory</h1>
-              <p className="text-muted-foreground">Manage feed stock levels and monitor consumption</p>
+        <main className="flex-1 responsive-container responsive-spacing overflow-y-auto">
+          <div className="responsive-flex items-start sm:items-center justify-between mb-6">
+            <div className="flex-1">
+              <h1 className="responsive-title text-foreground">Feed Inventory</h1>
+              <p className="responsive-subtitle">Manage feed stock levels and monitor consumption</p>
             </div>
-            <Button className="gap-2">
+            <Button className="gap-2 w-full sm:w-auto" onClick={() => setAddFeedDialogOpen(true)}>
               <Plus className="w-4 h-4" />
               Add Feed Item
             </Button>
           </div>
 
           {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="responsive-card-grid">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Items</CardTitle>
@@ -108,64 +122,213 @@ export default function FeedInventory() {
               <CardDescription>Monitor current stock levels and manage feed inventory</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-4 mb-6">
-                <div className="relative flex-1">
+              <div className="responsive-filters">
+                <div className="relative responsive-search">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input placeholder="Search feed items..." className="pl-10" />
                 </div>
-                <Button variant="outline">Export Report</Button>
+                <Button variant="outline" className="w-full sm:w-auto">Export Report</Button>
               </div>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Feed ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Stock Level</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Expiry Date</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {feedData.map((feed) => (
-                    <TableRow key={feed.id}>
-                      <TableCell className="font-medium">{feed.id}</TableCell>
-                      <TableCell>{feed.name}</TableCell>
-                      <TableCell>{feed.category}</TableCell>
-                      <TableCell>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>{feed.stock} {feed.unit}</span>
-                            <span className="text-muted-foreground">{feed.maxCapacity} {feed.unit}</span>
-                          </div>
-                          <Progress 
-                            value={getStockPercentage(feed.stock, feed.maxCapacity)} 
-                            className="h-2"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(feed.status)}>
-                          {feed.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{feed.expiryDate}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm">Edit</Button>
-                          <Button variant="ghost" size="sm">Reorder</Button>
-                        </div>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table className="mobile-table">
+                  <TableHeader className="mobile-table-header">
+                    <TableRow>
+                      <TableHead>Feed ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Stock Level</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Expiry Date</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {feedData.map((feed) => (
+                      <TableRow key={feed.id} className="mobile-table-row">
+                        <TableCell className="mobile-table-cell font-medium" data-label="Feed ID">{feed.id}</TableCell>
+                        <TableCell className="mobile-table-cell" data-label="Name">{feed.name}</TableCell>
+                        <TableCell className="mobile-table-cell" data-label="Category">{feed.category}</TableCell>
+                        <TableCell className="mobile-table-cell" data-label="Stock Level">
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>{feed.stock} {feed.unit}</span>
+                              <span className="text-muted-foreground">{feed.maxCapacity} {feed.unit}</span>
+                            </div>
+                            <Progress 
+                              value={getStockPercentage(feed.stock, feed.maxCapacity)} 
+                              className="h-2"
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="mobile-table-cell" data-label="Status">
+                          <Badge className={getStatusColor(feed.status)}>
+                            {feed.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="mobile-table-cell" data-label="Expiry Date">{feed.expiryDate}</TableCell>
+                        <TableCell className="mobile-table-cell" data-label="Actions">
+                          <div className="responsive-button-group">
+                            <Button variant="ghost" size="sm" className="w-full sm:w-auto">Edit</Button>
+                            <Button variant="ghost" size="sm" className="w-full sm:w-auto">Reorder</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </main>
       </div>
+
+      {/* Add Feed Item Dialog */}
+      <Dialog open={addFeedDialogOpen} onOpenChange={setAddFeedDialogOpen}>
+        <DialogContent className="w-[95vw] max-w-[425px] max-h-[90vh] overflow-y-auto mx-2 sm:mx-auto">
+          <DialogHeader className="space-y-2 pb-4">
+            <DialogTitle className="text-lg sm:text-xl">Add New Feed Item</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Add a new feed item to your inventory. Fill in all the required details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-sm font-medium">
+                Name *
+              </Label>
+              <Input
+                id="name"
+                value={newFeedItem.name}
+                onChange={(e) => setNewFeedItem({...newFeedItem, name: e.target.value})}
+                placeholder="e.g., Premium Layer Feed"
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="type" className="text-sm font-medium">
+                Type *
+              </Label>
+              <Select value={newFeedItem.type} onValueChange={(value) => setNewFeedItem({...newFeedItem, type: value})}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select feed type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="layer">Layer Feed</SelectItem>
+                  <SelectItem value="starter">Starter Feed</SelectItem>
+                  <SelectItem value="grower">Grower Feed</SelectItem>
+                  <SelectItem value="finisher">Finisher Feed</SelectItem>
+                  <SelectItem value="supplement">Supplement</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplier" className="text-sm font-medium">
+                Supplier *
+              </Label>
+              <Input
+                id="supplier"
+                value={newFeedItem.supplier}
+                onChange={(e) => setNewFeedItem({...newFeedItem, supplier: e.target.value})}
+                placeholder="e.g., AgriCorp Ltd"
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quantity" className="text-sm font-medium">
+                Quantity *
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="quantity"
+                  type="number"
+                  value={newFeedItem.quantity}
+                  onChange={(e) => setNewFeedItem({...newFeedItem, quantity: e.target.value})}
+                  placeholder="1000"
+                  className="flex-1 min-w-0"
+                />
+                <Select value={newFeedItem.unit} onValueChange={(value) => setNewFeedItem({...newFeedItem, unit: value})}>
+                  <SelectTrigger className="w-16 sm:w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="kg">kg</SelectItem>
+                    <SelectItem value="lbs">lbs</SelectItem>
+                    <SelectItem value="tons">tons</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cost" className="text-sm font-medium">
+                Cost per Unit
+              </Label>
+              <Input
+                id="cost"
+                type="number"
+                step="0.01"
+                value={newFeedItem.costPerUnit}
+                onChange={(e) => setNewFeedItem({...newFeedItem, costPerUnit: e.target.value})}
+                placeholder="25.50"
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="expiry" className="text-sm font-medium">
+                Expiry Date
+              </Label>
+              <Input
+                id="expiry"
+                type="date"
+                value={newFeedItem.expiryDate}
+                onChange={(e) => setNewFeedItem({...newFeedItem, expiryDate: e.target.value})}
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="location" className="text-sm font-medium">
+                Storage Location
+              </Label>
+              <Input
+                id="location"
+                value={newFeedItem.location}
+                onChange={(e) => setNewFeedItem({...newFeedItem, location: e.target.value})}
+                placeholder="e.g., Warehouse A, Section 2"
+                className="w-full"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t">
+            <Button 
+              variant="outline" 
+              onClick={() => setAddFeedDialogOpen(false)} 
+              className="w-full sm:w-auto order-2 sm:order-1"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                // Here you would typically save the data
+                console.log('Adding feed item:', newFeedItem)
+                setAddFeedDialogOpen(false)
+                setNewFeedItem({
+                  name: "",
+                  type: "",
+                  supplier: "",
+                  quantity: "",
+                  unit: "kg",
+                  costPerUnit: "",
+                  expiryDate: "",
+                  location: ""
+                })
+              }}
+              className="w-full sm:w-auto order-1 sm:order-2"
+            >
+              Add Feed Item
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

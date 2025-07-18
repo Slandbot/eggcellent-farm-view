@@ -11,6 +11,8 @@ import FeedInventory from "./pages/FeedInventory";
 import EggCollection from "./pages/EggCollection";
 import Medicine from "./pages/Medicine";
 import Reports from "./pages/Reports";
+import UserManagement from "./pages/UserManagement";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +43,8 @@ function AppContent() {
       <Route path="/eggs" element={<EggCollection />} />
       <Route path="/medicine" element={<Medicine />} />
       <Route path="/reports" element={<Reports />} />
+      <Route path="/users" element={<UserManagement />} />
+      <Route path="/profile" element={<Profile />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -1,22 +1,22 @@
-# Welcome to your Lovable project
+# Farm Management Project
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/6f893d62-7cd7-4e62-86c5-ae2f07625b82
+This is a farm management dashboard for tracking poultry operations.
 
 ## How can I edit this code?
 
 There are several ways of editing your application.
 
-**Use Lovable**
+**Use Online IDE**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/6f893d62-7cd7-4e62-86c5-ae2f07625b82) and start prompting.
+You can use any online development environment to edit this project.
 
-Changes made via Lovable will be committed automatically to this repo.
+Changes made will need to be committed manually to this repo.
 
 **Use your preferred IDE**
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+If you want to work locally using your own IDE, you can clone this repo and push changes.
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
@@ -62,12 +62,10 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/6f893d62-7cd7-4e62-86c5-ae2f07625b82) and click on Share -> Publish.
+You can deploy this project using any static hosting service like Vercel, Netlify, or GitHub Pages.
 
-## Can I connect a custom domain to my Lovable project?
+## Can I connect a custom domain to this project?
 
 Yes, you can!
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Most hosting providers allow you to connect custom domains. Check your hosting provider's documentation for specific instructions.

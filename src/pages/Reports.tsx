@@ -49,26 +49,26 @@ export default function Reports() {
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="h-screen bg-background flex overflow-hidden">
       <AppSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       
       <div className="flex-1 flex flex-col">
         <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         
-        <main className="flex-1 p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">Reports & Analytics</h1>
-              <p className="text-muted-foreground">Generate insights and track farm performance</p>
+        <main className="flex-1 responsive-container responsive-spacing overflow-y-auto">
+          <div className="responsive-flex items-start sm:items-center justify-between mb-6">
+            <div className="flex-1">
+              <h1 className="responsive-title text-foreground">Reports & Analytics</h1>
+              <p className="responsive-subtitle">Generate insights and track farm performance</p>
             </div>
-            <Button className="gap-2">
+            <Button className="gap-2 w-full sm:w-auto">
               <FileText className="w-4 h-4" />
               Generate Report
             </Button>
           </div>
 
           {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="responsive-card-grid">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
@@ -115,12 +115,12 @@ export default function Reports() {
           </div>
 
           {/* Reports Tabs */}
-          <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="production">Production</TabsTrigger>
-              <TabsTrigger value="health">Health & Medicine</TabsTrigger>
-              <TabsTrigger value="financial">Financial</TabsTrigger>
+          <Tabs defaultValue="overview" className="responsive-spacing">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+              <TabsTrigger value="production" className="text-xs sm:text-sm">Production</TabsTrigger>
+              <TabsTrigger value="health" className="text-xs sm:text-sm">Health & Medicine</TabsTrigger>
+              <TabsTrigger value="financial" className="text-xs sm:text-sm">Financial</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
@@ -164,24 +164,24 @@ export default function Reports() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="production" className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
+            <TabsContent value="production" className="responsive-spacing">
+              <div className="responsive-chart-grid">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Egg Production Analysis</CardTitle>
-                    <CardDescription>Weekly production trends and forecasts</CardDescription>
+                  <CardHeader className="responsive-card-content">
+                    <CardTitle className="text-lg sm:text-xl">Egg Production Analysis</CardTitle>
+                    <CardDescription className="responsive-subtitle">Weekly production trends and forecasts</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="responsive-card-content">
                     <ProductionChart />
                   </CardContent>
                 </Card>
                 
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Quick Actions</CardTitle>
-                    <CardDescription>Generate production reports</CardDescription>
+                  <CardHeader className="responsive-card-content">
+                    <CardTitle className="text-lg sm:text-xl">Quick Actions</CardTitle>
+                    <CardDescription className="responsive-subtitle">Generate production reports</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="responsive-card-content responsive-spacing">
                     <Button className="w-full justify-start gap-2">
                       <FileText className="w-4 h-4" />
                       Daily Production Report

@@ -10,6 +10,7 @@ interface UserRoleContextType extends AuthState {
   hasPermission: (permission: string) => boolean
   canAccess: (page: string) => boolean
   switchRole: (role: UserRole) => void
+  userRole: UserRole | null
 }
 
 const UserRoleContext = createContext<UserRoleContextType | undefined>(undefined)
@@ -47,8 +48,8 @@ const rolePermissions: Record<UserRole, string[]> = {
 
 // Define page access for each role
 const pageAccess: Record<UserRole, string[]> = {
-  "Admin": ["/", "/birds", "/feed", "/eggs", "/medicine", "/reports"],
-  "Farm Manager": ["/", "/birds", "/feed", "/eggs", "/medicine", "/reports"], 
+  "Admin": ["/", "/birds", "/feed", "/eggs", "/medicine", "/reports", "/users"],
+  "Farm Manager": ["/", "/birds", "/feed", "/eggs", "/medicine", "/reports", "/users"], 
   "Worker": ["/", "/eggs", "/birds", "/feed"]
 }
 
@@ -112,6 +113,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   }
 
   const isAuthenticated = !!user
+  const userRole = user?.role || null
 
   return (
     <UserRoleContext.Provider value={{ 
@@ -124,7 +126,8 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
       updateUser,
       hasPermission, 
       canAccess,
-      switchRole
+      switchRole,
+      userRole
     }}>
       {children}
     </UserRoleContext.Provider>

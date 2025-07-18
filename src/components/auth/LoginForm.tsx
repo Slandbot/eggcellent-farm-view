@@ -158,20 +158,6 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
             </Button>
           </div>
         </div>
-
-        <div className="mt-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            Don't have an account?{" "}
-            <Button
-              type="button"
-              variant="link"
-              className="p-0 h-auto"
-              onClick={onToggleMode}
-            >
-              Create account
-            </Button>
-          </p>
-        </div>
       </CardContent>
     </Card>
   )
