@@ -52,33 +52,33 @@ export default function EggCollection() {
   const weeklyTotal = 4850
 
   return (
-    <div className="h-screen bg-background flex overflow-hidden">
+    <div className="mobile-safe bg-background flex">
       <AppSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col mobile-content">
         <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         
-        <main className="flex-1 p-6 space-y-6 overflow-y-auto">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">Egg Collection</h1>
-              <p className="text-muted-foreground">Track daily egg collection and quality grading</p>
+        <main className="flex-1 p-3 sm:p-6 space-y-4 sm:space-y-6 mobile-content">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Egg Collection</h1>
+              <p className="text-sm sm:text-base text-muted-foreground">Track daily egg collection and quality grading</p>
             </div>
-            <Button className="gap-2" onClick={() => setRecordCollectionDialogOpen(true)}>
+            <Button className="gap-2 w-full sm:w-auto" onClick={() => setRecordCollectionDialogOpen(true)}>
               <Plus className="w-4 h-4" />
               Record Collection
             </Button>
           </div>
 
           {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Today's Collection</CardTitle>
                 <Egg className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalDaily}</div>
+                <div className="text-xl sm:text-2xl font-bold">{totalDaily}</div>
                 <p className="text-xs text-muted-foreground">+5% from yesterday</p>
               </CardContent>
             </Card>
@@ -89,7 +89,7 @@ export default function EggCollection() {
                 <TrendingUp className="h-4 w-4 text-emerald-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{weeklyTotal.toLocaleString()}</div>
+                <div className="text-xl sm:text-2xl font-bold">{weeklyTotal.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">+8% from last week</p>
               </CardContent>
             </Card>
@@ -100,7 +100,7 @@ export default function EggCollection() {
                 <Scale className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{avgWeight}</div>
+                <div className="text-xl sm:text-2xl font-bold">{avgWeight}</div>
                 <p className="text-xs text-muted-foreground">Standard grade A</p>
               </CardContent>
             </Card>
@@ -111,7 +111,7 @@ export default function EggCollection() {
                 <Calendar className="h-4 w-4 text-emerald-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">68%</div>
+                <div className="text-xl sm:text-2xl font-bold">68%</div>
                 <p className="text-xs text-muted-foreground">Premium quality</p>
               </CardContent>
             </Card>
@@ -119,63 +119,71 @@ export default function EggCollection() {
 
           {/* Production Chart */}
           <Card>
-            <CardHeader>
-              <CardTitle>Weekly Production Trend</CardTitle>
-              <CardDescription>Daily egg collection over the past week</CardDescription>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-lg sm:text-xl">Weekly Production Trend</CardTitle>
+              <CardDescription className="text-sm">Daily egg collection over the past week</CardDescription>
             </CardHeader>
-            <CardContent>
-              <ProductionChart />
+            <CardContent className="p-4 sm:p-6">
+              <div className="w-full overflow-x-auto">
+                <ProductionChart />
+              </div>
             </CardContent>
           </Card>
 
           {/* Collection Records */}
           <Card>
-            <CardHeader>
-              <CardTitle>Collection Records</CardTitle>
-              <CardDescription>Recent egg collection data with quality grades</CardDescription>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-lg sm:text-xl">Collection Records</CardTitle>
+              <CardDescription className="text-sm">Recent egg collection data with quality grades</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="flex gap-4 mb-6">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input placeholder="Search collections..." className="pl-10" />
                 </div>
-                <Button variant="outline">Filter by Date</Button>
-                <Button variant="outline">Export Report</Button>
+                <div className="flex gap-2 sm:gap-3">
+                  <Button variant="outline" className="flex-1 sm:flex-none text-sm">Filter by Date</Button>
+                  <Button variant="outline" className="flex-1 sm:flex-none text-sm">Export Report</Button>
+                </div>
               </div>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Collection ID</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Shift</TableHead>
-                    <TableHead>Pen</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Grade</TableHead>
-                    <TableHead>Avg Weight</TableHead>
-                    <TableHead>Collector</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {collectionData.map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell className="font-medium">{record.id}</TableCell>
-                      <TableCell>{record.date}</TableCell>
-                      <TableCell>{record.shift}</TableCell>
-                      <TableCell>{record.pen}</TableCell>
-                      <TableCell className="font-medium">{record.quantity}</TableCell>
-                      <TableCell>
-                        <Badge className={getGradeColor(record.grade)}>
-                          Grade {record.grade}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{record.weight}</TableCell>
-                      <TableCell>{record.collector}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="-mx-4 sm:mx-0 overflow-x-auto">
+                <div className="min-w-full inline-block align-middle">
+                  <Table className="min-w-full">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="whitespace-nowrap">Collection ID</TableHead>
+                        <TableHead className="whitespace-nowrap">Date</TableHead>
+                        <TableHead className="whitespace-nowrap">Shift</TableHead>
+                        <TableHead className="whitespace-nowrap">Pen</TableHead>
+                        <TableHead className="whitespace-nowrap">Quantity</TableHead>
+                        <TableHead className="whitespace-nowrap">Grade</TableHead>
+                        <TableHead className="whitespace-nowrap">Avg Weight</TableHead>
+                        <TableHead className="whitespace-nowrap">Collector</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {collectionData.map((record) => (
+                        <TableRow key={record.id}>
+                          <TableCell className="font-medium whitespace-nowrap">{record.id}</TableCell>
+                          <TableCell className="whitespace-nowrap">{record.date}</TableCell>
+                          <TableCell className="whitespace-nowrap">{record.shift}</TableCell>
+                          <TableCell className="whitespace-nowrap">{record.pen}</TableCell>
+                          <TableCell className="font-medium whitespace-nowrap">{record.quantity}</TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <Badge className={getGradeColor(record.grade)}>
+                              Grade {record.grade}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">{record.weight}</TableCell>
+                          <TableCell className="whitespace-nowrap">{record.collector}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </main>
