@@ -13,6 +13,7 @@ import { useUserRole } from '@/contexts/UserRoleContext';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Users, UserPlus, Settings, Activity, DollarSign, Eye, EyeOff, Trash2, Edit, Shield } from 'lucide-react';
+import { useUsers, useUserStats, useUserActions } from '@/hooks/useApiData';
 
 interface User {
   id: string;
@@ -41,9 +42,15 @@ const UserManagement: React.FC = () => {
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [filters, setFilters] = useState({ role: '', status: '', search: '' });
+  
+  // API hooks
+  const { data: apiUsers, loading: usersLoading, refetch: refetchUsers } = useUsers(filters);
+  const { data: userStats, loading: statsLoading } = useUserStats();
+  const { addUser: addUserApi, loading: actionLoading } = useUserActions();
 
-  // Mock data
-  const [users, setUsers] = useState<User[]>([
+  // Use API data or fallback to mock data
+  const [users, setUsers] = useState<User[]>(apiUsers || [
     {
       id: '1',
       name: 'John Admin',
@@ -75,6 +82,13 @@ const UserManagement: React.FC = () => {
       permissions: ['feed_record', 'egg_record', 'tasks']
     }
   ]);
+
+  // Update users when API data changes
+  React.useEffect(() => {
+    if (apiUsers) {
+      setUsers(apiUsers);
+    }
+  }, [apiUsers]);
 
   const [activityLogs] = useState<ActivityLog[]>([
     {
@@ -128,20 +142,35 @@ const UserManagement: React.FC = () => {
     return status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
   };
 
-  const handleAddUser = () => {
-    const user: User = {
-      id: Date.now().toString(),
+  const handleAddUser = async () => {
+    const success = await addUserApi({
       name: newUser.name,
       email: newUser.email,
       phone: newUser.phone,
       role: newUser.role,
-      status: 'active',
-      lastLogin: 'Never',
-      permissions: rolePermissions[newUser.role]
-    };
-    setUsers([...users, user]);
-    setNewUser({ name: '', email: '', phone: '', password: '', role: 'Worker', permissions: [] });
-    setIsAddUserOpen(false);
+      password: newUser.password
+    });
+    
+    if (success) {
+      setNewUser({ name: '', email: '', phone: '', password: '', role: 'Worker', permissions: [] });
+      setIsAddUserOpen(false);
+      refetchUsers();
+    } else {
+      // Fallback to local state update if API fails
+      const user: User = {
+        id: Date.now().toString(),
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        role: newUser.role,
+        status: 'active',
+        lastLogin: 'Never',
+        permissions: rolePermissions[newUser.role]
+      };
+      setUsers([...users, user]);
+      setNewUser({ name: '', email: '', phone: '', password: '', role: 'Worker', permissions: [] });
+      setIsAddUserOpen(false);
+    }
   };
 
   const handleDeleteUser = (userId: string) => {
@@ -211,6 +240,14 @@ const UserManagement: React.FC = () => {
         <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         <main className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6">
           <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 min-w-0">
+            {/* Loading State */}
+            {(usersLoading || statsLoading) && (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <span className="ml-2 text-muted-foreground">Loading user data...</span>
+              </div>
+            )}
+
             {/* Page Header */}
             <div className="flex flex-col space-y-3 sm:space-y-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 flex-1 px-1 sm:px-0">
@@ -220,9 +257,9 @@ const UserManagement: React.FC = () => {
                 </p>
               </div>
               {canManageUsers && (
-                <Button onClick={() => setIsAddUserOpen(true)} className="w-full sm:w-auto mx-1 sm:mx-0">
+                <Button onClick={() => setIsAddUserOpen(true)} className="w-full sm:w-auto mx-1 sm:mx-0" disabled={actionLoading}>
                   <UserPlus className="h-4 w-4 mr-2" />
-                  <span className="sm:inline">Add User</span>
+                  <span className="sm:inline">{actionLoading ? 'Loading...' : 'Add User'}</span>
                 </Button>
               )}
             </div>
@@ -265,66 +302,83 @@ const UserManagement: React.FC = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {users.map((user) => (
-                            <TableRow key={user.id}>
-                              <TableCell className="font-medium">
-                                <div>
-                                  <div>{user.name}</div>
-                                  <div className="text-sm text-gray-500 sm:hidden">{user.email}</div>
+                          {usersLoading ? (
+                            <TableRow>
+                              <TableCell colSpan={canManageUsers ? 7 : 6} className="text-center py-8">
+                                <div className="flex items-center justify-center">
+                                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                                  Loading users...
                                 </div>
                               </TableCell>
-                              <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
-                              <TableCell className="hidden lg:table-cell">{user.phone}</TableCell>
-                              <TableCell>
-                                <Badge className={getRoleBadgeColor(user.role)}>
-                                  <span className="hidden sm:inline">{user.role.replace('_', ' ').toUpperCase()}</span>
-                                  <span className="sm:hidden">{user.role.charAt(0)}</span>
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell">
-                                <Badge className={getStatusBadgeColor(user.status)}>
-                                  {user.status.toUpperCase()}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="hidden lg:table-cell">{user.lastLogin}</TableCell>
-                              {canManageUsers && (
-                                <TableCell>
-                                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-1 min-w-0">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedUser(user);
-                                        setIsEditUserOpen(true);
-                                      }}
-                                      className="w-full sm:w-auto justify-start sm:justify-center px-3 py-2 sm:px-2 sm:py-1"
-                                    >
-                                      <Edit className="h-4 w-4 mr-2 sm:mr-0 flex-shrink-0" />
-                                      <span className="sm:hidden">Edit User</span>
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => toggleUserStatus(user.id)}
-                                      className="w-full sm:w-auto justify-start sm:justify-center px-3 py-2 sm:px-2 sm:py-1"
-                                    >
-                                      {user.status === 'active' ? <EyeOff className="h-4 w-4 mr-2 sm:mr-0 flex-shrink-0" /> : <Eye className="h-4 w-4 mr-2 sm:mr-0 flex-shrink-0" />}
-                                      <span className="sm:hidden">{user.status === 'active' ? 'Deactivate' : 'Activate'}</span>
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleDeleteUser(user.id)}
-                                      className="text-red-600 hover:text-red-700 w-full sm:w-auto justify-start sm:justify-center px-3 py-2 sm:px-2 sm:py-1"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2 sm:mr-0 flex-shrink-0" />
-                                      <span className="sm:hidden">Delete User</span>
-                                    </Button>
+                            </TableRow>
+                          ) : users && users.length > 0 ? (
+                            users.map((user) => (
+                              <TableRow key={user.id}>
+                                <TableCell className="font-medium">
+                                  <div>
+                                    <div>{user.name}</div>
+                                    <div className="text-sm text-gray-500 sm:hidden">{user.email}</div>
                                   </div>
                                 </TableCell>
-                              )}
+                                <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
+                                <TableCell className="hidden lg:table-cell">{user.phone}</TableCell>
+                                <TableCell>
+                                  <Badge className={getRoleBadgeColor(user.role)}>
+                                    <span className="hidden sm:inline">{user.role.replace('_', ' ').toUpperCase()}</span>
+                                    <span className="sm:hidden">{user.role.charAt(0)}</span>
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="hidden md:table-cell">
+                                  <Badge className={getStatusBadgeColor(user.status)}>
+                                    {user.status.toUpperCase()}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="hidden lg:table-cell">{user.lastLogin}</TableCell>
+                                {canManageUsers && (
+                                  <TableCell>
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-1 min-w-0">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          setSelectedUser(user);
+                                          setIsEditUserOpen(true);
+                                        }}
+                                        className="w-full sm:w-auto justify-start sm:justify-center px-3 py-2 sm:px-2 sm:py-1"
+                                      >
+                                        <Edit className="h-4 w-4 mr-2 sm:mr-0 flex-shrink-0" />
+                                        <span className="sm:hidden">Edit User</span>
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => toggleUserStatus(user.id)}
+                                        className="w-full sm:w-auto justify-start sm:justify-center px-3 py-2 sm:px-2 sm:py-1"
+                                      >
+                                        {user.status === 'active' ? <EyeOff className="h-4 w-4 mr-2 sm:mr-0 flex-shrink-0" /> : <Eye className="h-4 w-4 mr-2 sm:mr-0 flex-shrink-0" />}
+                                        <span className="sm:hidden">{user.status === 'active' ? 'Deactivate' : 'Activate'}</span>
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleDeleteUser(user.id)}
+                                        className="text-red-600 hover:text-red-700 w-full sm:w-auto justify-start sm:justify-center px-3 py-2 sm:px-2 sm:py-1"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2 sm:mr-0 flex-shrink-0" />
+                                        <span className="sm:hidden">Delete User</span>
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                )}
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={canManageUsers ? 7 : 6} className="text-center py-8 text-muted-foreground">
+                                No users found. Try adjusting your filters or add a new user.
+                              </TableCell>
                             </TableRow>
-                          ))}
+                          )}
                         </TableBody>
                         </Table>
                       </div>
@@ -537,8 +591,8 @@ const UserManagement: React.FC = () => {
                 <Button variant="outline" onClick={() => setIsAddUserOpen(false)} className="w-full sm:w-auto order-2 sm:order-1">
                   Cancel
                 </Button>
-                <Button onClick={handleAddUser} className="w-full sm:w-auto order-1 sm:order-2">
-                  Add User
+                <Button onClick={handleAddUser} disabled={actionLoading} className="w-full sm:w-auto order-1 sm:order-2">
+                  {actionLoading ? 'Adding...' : 'Add User'}
                 </Button>
               </DialogFooter>
             </DialogContent>

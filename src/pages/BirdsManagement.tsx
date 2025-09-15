@@ -11,17 +11,17 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Search, Filter, Bird, Heart, AlertTriangle } from "lucide-react"
-
-const birdsData = [
-  { id: "B001", breed: "Rhode Island Red", age: "24 weeks", status: "Healthy", eggs: 285, pen: "A1" },
-  { id: "B002", breed: "Leghorn", age: "18 weeks", status: "Sick", eggs: 195, pen: "A2" },
-  { id: "B003", breed: "Sussex", age: "32 weeks", status: "Healthy", eggs: 310, pen: "B1" },
-  { id: "B004", breed: "Plymouth Rock", age: "28 weeks", status: "Quarantine", eggs: 267, pen: "C1" },
-]
+import { useBirds, useBirdsStats, useBirdActions } from "@/hooks/useApiData"
 
 export default function BirdsManagement() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [addBirdGroupDialogOpen, setAddBirdGroupDialogOpen] = useState(false)
+  const [filters, setFilters] = useState({ status: '', breed: '', search: '' })
+  
+  // API hooks
+  const { data: birdsData, loading: birdsLoading, refetch: refetchBirds } = useBirds(filters)
+  const { data: birdsStats, loading: statsLoading } = useBirdsStats()
+  const { createBirdGroup, loading: actionLoading } = useBirdActions()
   const [newBirdGroup, setNewBirdGroup] = useState({
     groupId: "",
     breed: "",
@@ -70,52 +70,62 @@ export default function BirdsManagement() {
             </Button>
           </div>
 
+          {/* Loading State */}
+          {(birdsLoading || statsLoading) && (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="ml-2 text-muted-foreground">Loading birds data...</span>
+            </div>
+          )}
+
           {/* Stats Cards */}
-          <div className="responsive-card-grid">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Birds</CardTitle>
-                <Bird className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">2,450</div>
-                <p className="text-xs text-muted-foreground">+12% from last month</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Healthy Birds</CardTitle>
-                <Heart className="h-4 w-4 text-emerald-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">2,380</div>
-                <p className="text-xs text-muted-foreground">97.1% of flock</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Sick/Quarantine</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">70</div>
-                <p className="text-xs text-muted-foreground">2.9% of flock</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Avg. Egg Production</CardTitle>
-                <Bird className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">264</div>
-                <p className="text-xs text-muted-foreground">eggs per bird/year</p>
-              </CardContent>
-            </Card>
-          </div>
+          {!statsLoading && (
+            <div className="responsive-card-grid">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Birds</CardTitle>
+                  <Bird className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{birdsStats?.totalBirds || "2,450"}</div>
+                  <p className="text-xs text-muted-foreground">{birdsStats?.totalChange || "+12% from last month"}</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Healthy Birds</CardTitle>
+                  <Heart className="h-4 w-4 text-emerald-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{birdsStats?.healthyBirds || "2,380"}</div>
+                  <p className="text-xs text-muted-foreground">{birdsStats?.healthyPercentage || "97.1%"} of flock</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Sick/Quarantine</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{birdsStats?.sickBirds || "70"}</div>
+                  <p className="text-xs text-muted-foreground">{birdsStats?.sickPercentage || "2.9%"} of flock</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Avg. Egg Production</CardTitle>
+                  <Bird className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{birdsStats?.avgEggProduction || "264"}</div>
+                  <p className="text-xs text-muted-foreground">eggs per bird/year</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Filters and Search */}
           <Card>
@@ -127,9 +137,14 @@ export default function BirdsManagement() {
               <div className="responsive-filters">
                 <div className="relative responsive-search">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input placeholder="Search birds..." className="pl-10" />
+                  <Input 
+                    placeholder="Search birds..." 
+                    className="pl-10" 
+                    value={filters.search}
+                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                  />
                 </div>
-                <Select>
+                <Select value={filters.status || 'all'} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value === 'all' ? '' : value }))}>
                   <SelectTrigger className="responsive-select">
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
@@ -140,7 +155,7 @@ export default function BirdsManagement() {
                     <SelectItem value="quarantine">Quarantine</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select>
+                <Select value={filters.breed || 'all'} onValueChange={(value) => setFilters(prev => ({ ...prev, breed: value === 'all' ? '' : value }))}>
                   <SelectTrigger className="responsive-select">
                     <SelectValue placeholder="Filter by breed" />
                   </SelectTrigger>
@@ -167,26 +182,43 @@ export default function BirdsManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {birdsData.map((bird) => (
-                      <TableRow key={bird.id} className="mobile-table-row">
-                        <TableCell className="mobile-table-cell font-medium" data-label="Bird ID">{bird.id}</TableCell>
-                        <TableCell className="mobile-table-cell" data-label="Breed">{bird.breed}</TableCell>
-                        <TableCell className="mobile-table-cell" data-label="Age">{bird.age}</TableCell>
-                        <TableCell className="mobile-table-cell" data-label="Status">
-                          <Badge className={getStatusColor(bird.status)}>
-                            <span className="flex items-center gap-1">
-                              {getStatusIcon(bird.status)}
-                              {bird.status}
-                            </span>
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="mobile-table-cell" data-label="Eggs/Year">{bird.eggs}</TableCell>
-                        <TableCell className="mobile-table-cell" data-label="Pen Location">{bird.pen}</TableCell>
-                        <TableCell className="mobile-table-cell" data-label="Actions">
-                          <Button variant="ghost" size="sm" className="w-full sm:w-auto">Edit</Button>
+                    {birdsLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <div className="flex items-center justify-center">
+                            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                            Loading birds...
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : birdsData && birdsData.length > 0 ? (
+                      birdsData.map((bird: any) => (
+                        <TableRow key={bird.id} className="mobile-table-row">
+                          <TableCell className="mobile-table-cell font-medium" data-label="Bird ID">{bird.id}</TableCell>
+                          <TableCell className="mobile-table-cell" data-label="Breed">{bird.breed}</TableCell>
+                          <TableCell className="mobile-table-cell" data-label="Age">{bird.age}</TableCell>
+                          <TableCell className="mobile-table-cell" data-label="Status">
+                            <Badge className={getStatusColor(bird.status)}>
+                              <span className="flex items-center gap-1">
+                                {getStatusIcon(bird.status)}
+                                {bird.status}
+                              </span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="mobile-table-cell" data-label="Eggs/Year">{bird.eggs || bird.eggProduction}</TableCell>
+                          <TableCell className="mobile-table-cell" data-label="Pen Location">{bird.pen}</TableCell>
+                          <TableCell className="mobile-table-cell" data-label="Actions">
+                            <Button variant="ghost" size="sm" className="w-full sm:w-auto">Edit</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          No birds found. Try adjusting your filters or add a new bird group.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -326,24 +358,30 @@ export default function BirdsManagement() {
               Cancel
             </Button>
             <Button 
-              onClick={() => {
-                // Here you would typically save the data
-                console.log('Adding bird group:', newBirdGroup)
-                setAddBirdGroupDialogOpen(false)
-                setNewBirdGroup({
-                  groupId: "",
-                  breed: "",
-                  count: "",
-                  age: "",
-                  pen: "",
-                  status: "healthy",
-                  acquisitionDate: "",
-                  notes: ""
+              onClick={async () => {
+                const success = await createBirdGroup({
+                  ...newBirdGroup,
+                  count: parseInt(newBirdGroup.count)
                 })
+                if (success) {
+                  setAddBirdGroupDialogOpen(false)
+                  setNewBirdGroup({
+                    groupId: "",
+                    breed: "",
+                    count: "",
+                    age: "",
+                    pen: "",
+                    status: "healthy",
+                    acquisitionDate: "",
+                    notes: ""
+                  })
+                  refetchBirds()
+                }
               }}
+              disabled={actionLoading}
               className="w-full sm:w-auto order-1 sm:order-2"
             >
-              Add Bird Group
+              {actionLoading ? "Adding..." : "Add Bird Group"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -31,21 +31,21 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
     try {
       await login(email, password)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed")
+      if (err instanceof Error) {
+        if (err.message.includes('fetch')) {
+          setError("Cannot connect to server. Please check if the backend is running.")
+        } else {
+          setError(err.message)
+        }
+      } else {
+        setError("Login failed. Please try again.")
+      }
     }
   }
 
-  const fillDemoCredentials = (role: string) => {
-    const credentials = {
-      admin: { email: "admin@farm.com", password: "password123" },
-      manager: { email: "manager@farm.com", password: "password123" },
-      worker: { email: "worker@farm.com", password: "password123" }
-    }
-    
-    const cred = credentials[role as keyof typeof credentials]
-    setEmail(cred.email)
-    setPassword(cred.password)
-  }
+
+
+
 
   return (
     <Card className="w-full max-w-md">
@@ -124,40 +124,6 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
           </Button>
         </form>
 
-        <div className="mt-6">
-          <div className="text-center text-sm text-muted-foreground mb-3">
-            Demo Accounts - Click to auto-fill:
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fillDemoCredentials("admin")}
-              className="text-xs"
-            >
-              Admin
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fillDemoCredentials("manager")}
-              className="text-xs"
-            >
-              Manager
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fillDemoCredentials("worker")}
-              className="text-xs"
-            >
-              Worker
-            </Button>
-          </div>
-        </div>
       </CardContent>
     </Card>
   )

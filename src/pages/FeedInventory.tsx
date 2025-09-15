@@ -11,18 +11,17 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search, Package, AlertTriangle, TrendingDown, Truck } from "lucide-react"
-
-const feedData = [
-  { id: "F001", name: "Layer Mash Premium", category: "Layer Feed", stock: 850, maxCapacity: 1000, unit: "kg", status: "In Stock", expiryDate: "2024-12-15" },
-  { id: "F002", name: "Broiler Starter", category: "Broiler Feed", stock: 120, maxCapacity: 500, unit: "kg", status: "Low Stock", expiryDate: "2024-11-20" },
-  { id: "F003", name: "Calcium Supplement", category: "Supplements", stock: 45, maxCapacity: 100, unit: "kg", status: "Low Stock", expiryDate: "2025-03-10" },
-  { id: "F004", name: "Organic Corn Feed", category: "Grain", stock: 0, maxCapacity: 800, unit: "kg", status: "Out of Stock", expiryDate: "2024-10-30" },
-  { id: "F005", name: "Vitamin Mix", category: "Supplements", stock: 75, maxCapacity: 100, unit: "kg", status: "In Stock", expiryDate: "2025-01-15" },
-]
+import { useFeedInventory, useFeedStats, useFeedActions } from "@/hooks/useApiData"
 
 export default function FeedInventory() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [addFeedDialogOpen, setAddFeedDialogOpen] = useState(false)
+  const [filters, setFilters] = useState({ type: '', status: '', supplier: '', search: '' })
+  
+  // API hooks
+  const { data: feedData, loading: feedLoading, refetch: refetchFeed } = useFeedInventory(filters)
+  const { data: feedStats, loading: statsLoading } = useFeedStats()
+  const { addFeedItem, loading: actionLoading } = useFeedActions()
   const [newFeedItem, setNewFeedItem] = useState({
     name: "",
     type: "",
@@ -68,52 +67,62 @@ export default function FeedInventory() {
             </Button>
           </div>
 
+          {/* Loading State */}
+          {(feedLoading || statsLoading) && (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="ml-2 text-muted-foreground">Loading feed inventory data...</span>
+            </div>
+          )}
+
           {/* Stats Cards */}
-          <div className="responsive-card-grid">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{feedData.length}</div>
-                <p className="text-xs text-muted-foreground">Feed categories tracked</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{feedData.filter(item => item.status === "Low Stock").length}</div>
-                <p className="text-xs text-muted-foreground">Need restocking</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Out of Stock</CardTitle>
-                <TrendingDown className="h-4 w-4 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{feedData.filter(item => item.status === "Out of Stock").length}</div>
-                <p className="text-xs text-muted-foreground">Urgent reorder needed</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${totalValue.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">Current inventory value</p>
-              </CardContent>
-            </Card>
-          </div>
+          {!statsLoading && (
+            <div className="responsive-card-grid">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{feedStats?.totalItems || (feedData?.length || 0)}</div>
+                  <p className="text-xs text-muted-foreground">Feed categories tracked</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{feedStats?.lowStockItems || (feedData?.filter(item => item.status === "Low Stock").length || 0)}</div>
+                  <p className="text-xs text-muted-foreground">Need restocking</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Out of Stock</CardTitle>
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{feedStats?.outOfStockItems || (feedData?.filter(item => item.status === "Out of Stock").length || 0)}</div>
+                  <p className="text-xs text-muted-foreground">Urgent reorder needed</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">${feedStats?.totalValue || (feedData?.reduce((sum, item) => sum + (item.stock * 15), 0) || 0).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground">Current inventory value</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Feed Inventory Table */}
           <Card>
@@ -125,7 +134,12 @@ export default function FeedInventory() {
               <div className="responsive-filters">
                 <div className="relative responsive-search">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input placeholder="Search feed items..." className="pl-10" />
+                  <Input 
+                    placeholder="Search feed items..." 
+                    className="pl-10" 
+                    value={filters.search}
+                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                  />
                 </div>
                 <Button variant="outline" className="w-full sm:w-auto">Export Report</Button>
               </div>
@@ -144,37 +158,54 @@ export default function FeedInventory() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {feedData.map((feed) => (
-                      <TableRow key={feed.id} className="mobile-table-row">
-                        <TableCell className="mobile-table-cell font-medium" data-label="Feed ID">{feed.id}</TableCell>
-                        <TableCell className="mobile-table-cell" data-label="Name">{feed.name}</TableCell>
-                        <TableCell className="mobile-table-cell" data-label="Category">{feed.category}</TableCell>
-                        <TableCell className="mobile-table-cell" data-label="Stock Level">
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span>{feed.stock} {feed.unit}</span>
-                              <span className="text-muted-foreground">{feed.maxCapacity} {feed.unit}</span>
-                            </div>
-                            <Progress 
-                              value={getStockPercentage(feed.stock, feed.maxCapacity)} 
-                              className="h-2"
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="mobile-table-cell" data-label="Status">
-                          <Badge className={getStatusColor(feed.status)}>
-                            {feed.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="mobile-table-cell" data-label="Expiry Date">{feed.expiryDate}</TableCell>
-                        <TableCell className="mobile-table-cell" data-label="Actions">
-                          <div className="responsive-button-group">
-                            <Button variant="ghost" size="sm" className="w-full sm:w-auto">Edit</Button>
-                            <Button variant="ghost" size="sm" className="w-full sm:w-auto">Reorder</Button>
+                    {feedLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <div className="flex items-center justify-center">
+                            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                            Loading feed inventory...
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : feedData && feedData.length > 0 ? (
+                      feedData.map((feed: any) => (
+                        <TableRow key={feed.id} className="mobile-table-row">
+                          <TableCell className="mobile-table-cell font-medium" data-label="Feed ID">{feed.id}</TableCell>
+                          <TableCell className="mobile-table-cell" data-label="Name">{feed.name}</TableCell>
+                          <TableCell className="mobile-table-cell" data-label="Category">{feed.category}</TableCell>
+                          <TableCell className="mobile-table-cell" data-label="Stock Level">
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span>{feed.stock} {feed.unit}</span>
+                                <span className="text-muted-foreground">{feed.maxCapacity} {feed.unit}</span>
+                              </div>
+                              <Progress 
+                                value={getStockPercentage(feed.stock, feed.maxCapacity)} 
+                                className="h-2"
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell className="mobile-table-cell" data-label="Status">
+                            <Badge className={getStatusColor(feed.status)}>
+                              {feed.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="mobile-table-cell" data-label="Expiry Date">{feed.expiryDate}</TableCell>
+                          <TableCell className="mobile-table-cell" data-label="Actions">
+                            <div className="responsive-button-group">
+                              <Button variant="ghost" size="sm" className="w-full sm:w-auto">Edit</Button>
+                              <Button variant="ghost" size="sm" className="w-full sm:w-auto">Reorder</Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          No feed items found. Try adjusting your filters or add a new feed item.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -307,24 +338,31 @@ export default function FeedInventory() {
               Cancel
             </Button>
             <Button 
-              onClick={() => {
-                // Here you would typically save the data
-                console.log('Adding feed item:', newFeedItem)
-                setAddFeedDialogOpen(false)
-                setNewFeedItem({
-                  name: "",
-                  type: "",
-                  supplier: "",
-                  quantity: "",
-                  unit: "kg",
-                  costPerUnit: "",
-                  expiryDate: "",
-                  location: ""
+              onClick={async () => {
+                const success = await addFeedItem({
+                  ...newFeedItem,
+                  quantity: parseInt(newFeedItem.quantity),
+                  costPerUnit: parseFloat(newFeedItem.costPerUnit)
                 })
+                if (success) {
+                  setAddFeedDialogOpen(false)
+                  setNewFeedItem({
+                    name: "",
+                    type: "",
+                    supplier: "",
+                    quantity: "",
+                    unit: "kg",
+                    costPerUnit: "",
+                    expiryDate: "",
+                    location: ""
+                  })
+                  refetchFeed()
+                }
               }}
+              disabled={actionLoading}
               className="w-full sm:w-auto order-1 sm:order-2"
             >
-              Add Feed Item
+              {actionLoading ? "Adding..." : "Add Feed Item"}
             </Button>
           </DialogFooter>
         </DialogContent>

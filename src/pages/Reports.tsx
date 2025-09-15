@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProductionChart } from "@/components/dashboard/ProductionChart"
 import { FileText, Download, Calendar, TrendingUp, BarChart3, PieChart } from "lucide-react"
+import { useProductionReport, useHealthReport, useFeedConsumptionReport, useDashboardStats } from "@/hooks/useApiData"
 
 const reportTemplates = [
   { id: "R001", name: "Daily Production Report", type: "Production", frequency: "Daily", lastGenerated: "2024-01-15", status: "Active" },
@@ -26,6 +27,13 @@ const recentReports = [
 
 export default function Reports() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [filters, setFilters] = useState({ type: '', period: '', status: '' })
+  
+  // API hooks
+  const { data: productionData, loading: productionLoading } = useProductionReport(filters.period || '30d')
+  const { data: healthData, loading: healthLoading } = useHealthReport(filters.period || '30d')
+  const { data: feedData, loading: feedLoading } = useFeedConsumptionReport(filters.period || '30d')
+  const { data: dashboardStats, loading: statsLoading } = useDashboardStats()
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -67,52 +75,62 @@ export default function Reports() {
             </Button>
           </div>
 
+          {/* Loading State */}
+          {(productionLoading || healthLoading || feedLoading || statsLoading) && (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="ml-2 text-muted-foreground">Loading reports data...</span>
+            </div>
+          )}
+
           {/* Stats Cards */}
-          <div className="responsive-card-grid">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">47</div>
-                <p className="text-xs text-muted-foreground">Generated this month</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Automated Reports</CardTitle>
-                <TrendingUp className="h-4 w-4 text-emerald-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{reportTemplates.filter(r => r.status === "Active").length}</div>
-                <p className="text-xs text-muted-foreground">Currently active</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Data Insights</CardTitle>
-                <BarChart3 className="h-4 w-4 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">12</div>
-                <p className="text-xs text-muted-foreground">Key metrics tracked</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Performance Score</CardTitle>
-                <PieChart className="h-4 w-4 text-purple-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">94%</div>
-                <p className="text-xs text-muted-foreground">Farm efficiency</p>
-              </CardContent>
-            </Card>
-          </div>
+          {!statsLoading && (
+            <div className="responsive-card-grid">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dashboardStats?.totalReports || "47"}</div>
+                  <p className="text-xs text-muted-foreground">Generated this month</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Automated Reports</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dashboardStats?.automatedReports || reportTemplates.filter(r => r.status === "Active").length}</div>
+                  <p className="text-xs text-muted-foreground">Currently active</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Data Insights</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-blue-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dashboardStats?.dataInsights || "12"}</div>
+                  <p className="text-xs text-muted-foreground">Key metrics tracked</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Performance Score</CardTitle>
+                  <PieChart className="h-4 w-4 text-purple-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dashboardStats?.performanceScore || "94%"}</div>
+                  <p className="text-xs text-muted-foreground">Farm efficiency</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Reports Tabs */}
           <Tabs defaultValue="overview" className="responsive-spacing">

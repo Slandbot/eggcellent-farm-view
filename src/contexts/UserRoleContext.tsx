@@ -5,11 +5,11 @@ import { authService } from "@/services/authService"
 interface UserRoleContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>
   register: (name: string, email: string, password: string, role: UserRole) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   updateUser: (updates: Partial<User>) => Promise<void>
   hasPermission: (permission: string) => boolean
   canAccess: (page: string) => boolean
-  switchRole: (role: UserRole) => void
+  switchRole: (role: UserRole) => Promise<void>
   userRole: UserRole | null
 }
 
@@ -58,10 +58,19 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check for existing session on mount
-    const currentUser = authService.getCurrentUser()
-    setUser(currentUser)
-    setIsLoading(false)
+    const initAuth = async () => {
+      try {
+        const user = await authService.initializeAuth()
+        setUser(user)
+      } catch (error) {
+        console.error('Authentication initialization failed:', error)
+        setUser(null)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    initAuth()
   }, [])
 
   const login = async (email: string, password: string): Promise<void> => {
@@ -84,21 +93,30 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const logout = (): void => {
-    authService.logout()
-    setUser(null)
+  const logout = async (): Promise<void> => {
+    try {
+      await authService.logout()
+    } catch (error) {
+      console.error('Logout failed:', error)
+    } finally {
+      setUser(null)
+    }
   }
 
   const updateUser = async (updates: Partial<User>): Promise<void> => {
     if (!user) return
-    const updatedUser = await authService.updateUser(updates)
+    const updatedUser = await authService.updateProfile(updates)
     setUser(updatedUser)
   }
 
-  const switchRole = (role: UserRole): void => {
-    authService.switchRole(role)
-    if (user) {
-      setUser({ ...user, role })
+  const switchRole = async (role: UserRole): Promise<void> => {
+    if (!user) return
+    try {
+      const updatedUser = await authService.updateProfile({ role })
+      setUser(updatedUser)
+    } catch (error) {
+      console.error('Failed to switch role:', error)
+      throw error
     }
   }
 

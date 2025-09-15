@@ -25,9 +25,22 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const navigate = useNavigate()
   const { user, logout, switchRole, hasPermission } = useUserRole()
 
-  const handleRoleSwitch = (role: UserRole) => {
-    switchRole(role)
-    window.location.reload() // Refresh to update permissions
+  const handleLogout = async () => {
+    try {
+      await logout()
+      navigate('/login')
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
+  }
+
+  const handleRoleSwitch = async (role: UserRole) => {
+    try {
+      await switchRole(role)
+      window.location.reload() // Refresh to update permissions
+    } catch (error) {
+      console.error('Role switch failed:', error)
+    }
   }
 
   return (
@@ -123,7 +136,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
             )}
             
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} className="text-destructive">
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive">
               <LogOut className="w-4 h-4 mr-2" />
               Logout
             </DropdownMenuItem>

@@ -8,13 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Search, Syringe, Shield, AlertTriangle, Calendar } from "lucide-react"
-
-const medicineData = [
-  { id: "M001", name: "Antibiotic XL", type: "Antibiotic", stock: 25, unit: "bottles", status: "In Stock", expiryDate: "2025-06-15", usage: "Respiratory infections" },
-  { id: "M002", name: "Vitamin B Complex", type: "Vitamin", stock: 5, unit: "packets", status: "Low Stock", expiryDate: "2024-12-20", usage: "General health" },
-  { id: "M003", name: "Newcastle Vaccine", type: "Vaccine", stock: 0, unit: "doses", status: "Out of Stock", expiryDate: "2024-11-30", usage: "Disease prevention" },
-  { id: "M004", name: "Coccidiosis Treatment", type: "Treatment", stock: 15, unit: "bottles", status: "In Stock", expiryDate: "2025-03-10", usage: "Parasitic treatment" },
-]
+import { useMedicineInventory, useMedicineStats, useMedicineActions } from "@/hooks/useApiData"
 
 const treatmentRecords = [
   { id: "T001", date: "2024-01-15", birdGroup: "A1", treatment: "Antibiotic XL", dosage: "5ml per bird", adminBy: "Dr. Smith", reason: "Respiratory infection" },
@@ -24,6 +18,12 @@ const treatmentRecords = [
 
 export default function Medicine() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [filters, setFilters] = useState({ type: '', status: '', search: '' })
+  
+  // API hooks
+  const { data: medicineData, loading: medicineLoading, refetch: refetchMedicine } = useMedicineInventory(filters)
+  const { data: medicineStats, loading: statsLoading } = useMedicineStats()
+  const { addMedicine, loading: actionLoading } = useMedicineActions()
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -69,52 +69,62 @@ export default function Medicine() {
             </div>
           </div>
 
+          {/* Loading State */}
+          {(medicineLoading || statsLoading) && (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="ml-2 text-muted-foreground">Loading medicine data...</span>
+            </div>
+          )}
+
           {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Medicines</CardTitle>
-                <Syringe className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{medicineData.length}</div>
-                <p className="text-xs text-muted-foreground">Different medicines tracked</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{medicineData.filter(item => item.status === "Low Stock").length}</div>
-                <p className="text-xs text-muted-foreground">Need restocking</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Treatments</CardTitle>
-                <Shield className="h-4 w-4 text-emerald-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">3</div>
-                <p className="text-xs text-muted-foreground">Ongoing treatments</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
-                <Calendar className="h-4 w-4 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">1</div>
-                <p className="text-xs text-muted-foreground">Within 30 days</p>
-              </CardContent>
-            </Card>
-          </div>
+          {!statsLoading && (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Medicines</CardTitle>
+                  <Syringe className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{medicineStats?.totalMedicines || medicineData?.length || "0"}</div>
+                  <p className="text-xs text-muted-foreground">Different medicines tracked</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{medicineStats?.lowStockItems || medicineData?.filter((item: any) => item.status === "Low Stock").length || "0"}</div>
+                  <p className="text-xs text-muted-foreground">Need restocking</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Active Treatments</CardTitle>
+                  <Shield className="h-4 w-4 text-emerald-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{medicineStats?.activeTreatments || "3"}</div>
+                  <p className="text-xs text-muted-foreground">Ongoing treatments</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
+                  <Calendar className="h-4 w-4 text-red-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{medicineStats?.expiringSoon || "1"}</div>
+                  <p className="text-xs text-muted-foreground">Within 30 days</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Medicine Inventory */}
           <Card>
@@ -126,18 +136,34 @@ export default function Medicine() {
               <div className="flex gap-4 mb-6">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input placeholder="Search medicines..." className="pl-10" />
+                  <Input 
+                    placeholder="Search medicines..." 
+                    className="pl-10" 
+                    value={filters.search}
+                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                  />
                 </div>
-                <Select>
+                <Select value={filters.type} onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Filter by type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="">All Types</SelectItem>
                     <SelectItem value="vaccine">Vaccines</SelectItem>
                     <SelectItem value="antibiotic">Antibiotics</SelectItem>
                     <SelectItem value="vitamin">Vitamins</SelectItem>
                     <SelectItem value="treatment">Treatments</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Status</SelectItem>
+                    <SelectItem value="In Stock">In Stock</SelectItem>
+                    <SelectItem value="Low Stock">Low Stock</SelectItem>
+                    <SelectItem value="Out of Stock">Out of Stock</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -156,31 +182,48 @@ export default function Medicine() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {medicineData.map((medicine) => (
-                    <TableRow key={medicine.id}>
-                      <TableCell className="font-medium">{medicine.id}</TableCell>
-                      <TableCell>{medicine.name}</TableCell>
-                      <TableCell>
-                        <Badge className={getTypeColor(medicine.type)}>
-                          {medicine.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{medicine.stock} {medicine.unit}</TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(medicine.status)}>
-                          {medicine.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{medicine.expiryDate}</TableCell>
-                      <TableCell>{medicine.usage}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm">Edit</Button>
-                          <Button variant="ghost" size="sm">Use</Button>
+                  {medicineLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8">
+                        <div className="flex items-center justify-center">
+                          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                          Loading medicines...
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : medicineData && medicineData.length > 0 ? (
+                    medicineData.map((medicine: any) => (
+                      <TableRow key={medicine.id}>
+                        <TableCell className="font-medium">{medicine.id}</TableCell>
+                        <TableCell>{medicine.name}</TableCell>
+                        <TableCell>
+                          <Badge className={getTypeColor(medicine.type)}>
+                            {medicine.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{medicine.stock} {medicine.unit}</TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(medicine.status)}>
+                            {medicine.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{medicine.expiryDate}</TableCell>
+                        <TableCell>{medicine.usage}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="sm">Edit</Button>
+                            <Button variant="ghost" size="sm">Use</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        No medicines found. Try adjusting your filters or add a new medicine.
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

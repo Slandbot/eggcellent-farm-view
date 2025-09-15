@@ -5,12 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { UserRoleProvider, useUserRole } from "@/contexts/UserRoleContext";
 import { AuthPage } from "@/components/auth/AuthPage";
+import AuthErrorHandler from "@/components/AuthErrorHandler";
 import Index from "./pages/Index";
 import BirdsManagement from "./pages/BirdsManagement";
 import FeedInventory from "./pages/FeedInventory";
 import EggCollection from "./pages/EggCollection";
 import Medicine from "./pages/Medicine";
 import Reports from "./pages/Reports";
+import Statistics from "./pages/Statistics";
 import UserManagement from "./pages/UserManagement";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
@@ -43,6 +45,7 @@ function AppContent() {
       <Route path="/eggs" element={<EggCollection />} />
       <Route path="/medicine" element={<Medicine />} />
       <Route path="/reports" element={<Reports />} />
+      <Route path="/statistics" element={<Statistics />} />
       <Route path="/users" element={<UserManagement />} />
       <Route path="/profile" element={<Profile />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
@@ -53,15 +56,16 @@ function AppContent() {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <UserRoleProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+    <BrowserRouter>
+      <UserRoleProvider>
+        <TooltipProvider>
+          <AuthErrorHandler />
+          <Toaster />
+          <Sonner />
           <AppContent />
-        </BrowserRouter>
-      </TooltipProvider>
-    </UserRoleProvider>
+        </TooltipProvider>
+      </UserRoleProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 

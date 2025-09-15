@@ -11,18 +11,17 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ProductionChart } from "@/components/dashboard/ProductionChart"
 import { Plus, Search, Egg, TrendingUp, Calendar, Scale } from "lucide-react"
-
-const collectionData = [
-  { id: "EC001", date: "2024-01-15", shift: "Morning", pen: "A1", quantity: 145, grade: "A", weight: "58g avg", collector: "John Doe" },
-  { id: "EC002", date: "2024-01-15", shift: "Evening", pen: "A1", quantity: 132, grade: "A", weight: "57g avg", collector: "Jane Smith" },
-  { id: "EC003", date: "2024-01-15", shift: "Morning", pen: "B1", quantity: 168, grade: "AA", weight: "61g avg", collector: "John Doe" },
-  { id: "EC004", date: "2024-01-15", shift: "Evening", pen: "B1", quantity: 155, grade: "A", weight: "59g avg", collector: "Mike Johnson" },
-  { id: "EC005", date: "2024-01-14", shift: "Morning", pen: "C1", quantity: 198, grade: "AA", weight: "62g avg", collector: "Sarah Lee" },
-]
+import { useEggCollections, useEggStats, useEggActions } from "@/hooks/useApiData"
 
 export default function EggCollection() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [recordCollectionDialogOpen, setRecordCollectionDialogOpen] = useState(false)
+  const [filters, setFilters] = useState({ pen: '', grade: '', date: '', search: '' })
+  
+  // API hooks
+  const { data: collectionData, loading: collectionLoading, refetch: refetchCollections } = useEggCollections(filters)
+  const { data: eggStats, loading: statsLoading } = useEggStats()
+  const { recordCollection, loading: actionLoading } = useEggActions()
   const [newCollection, setNewCollection] = useState({
     date: new Date().toISOString().split('T')[0],
     shift: "",
@@ -70,52 +69,62 @@ export default function EggCollection() {
             </Button>
           </div>
 
+          {/* Loading State */}
+          {(collectionLoading || statsLoading) && (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="ml-2 text-muted-foreground">Loading egg collection data...</span>
+            </div>
+          )}
+
           {/* Stats Cards */}
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Today's Collection</CardTitle>
-                <Egg className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl sm:text-2xl font-bold">{totalDaily}</div>
-                <p className="text-xs text-muted-foreground">+5% from yesterday</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Week Total</CardTitle>
-                <TrendingUp className="h-4 w-4 text-emerald-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl sm:text-2xl font-bold">{weeklyTotal.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">+8% from last week</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Avg Weight</CardTitle>
-                <Scale className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl sm:text-2xl font-bold">{avgWeight}</div>
-                <p className="text-xs text-muted-foreground">Standard grade A</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Grade AA Rate</CardTitle>
-                <Calendar className="h-4 w-4 text-emerald-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl sm:text-2xl font-bold">68%</div>
-                <p className="text-xs text-muted-foreground">Premium quality</p>
-              </CardContent>
-            </Card>
-          </div>
+          {!statsLoading && (
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Today's Collection</CardTitle>
+                  <Egg className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl sm:text-2xl font-bold">{eggStats?.todayCollection || totalDaily}</div>
+                  <p className="text-xs text-muted-foreground">{eggStats?.todayChange || "+5% from yesterday"}</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Week Total</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl sm:text-2xl font-bold">{eggStats?.weeklyTotal?.toLocaleString() || weeklyTotal.toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground">{eggStats?.weeklyChange || "+8% from last week"}</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Avg Weight</CardTitle>
+                  <Scale className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl sm:text-2xl font-bold">{eggStats?.avgWeight || avgWeight}</div>
+                  <p className="text-xs text-muted-foreground">Standard grade A</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Grade AA Rate</CardTitle>
+                  <Calendar className="h-4 w-4 text-emerald-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl sm:text-2xl font-bold">{eggStats?.gradeAARate || "68%"}</div>
+                  <p className="text-xs text-muted-foreground">Premium quality</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Production Chart */}
           <Card>
@@ -140,10 +149,31 @@ export default function EggCollection() {
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input placeholder="Search collections..." className="pl-10" />
+                  <Input 
+                    placeholder="Search collections..." 
+                    className="pl-10" 
+                    value={filters.search}
+                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                  />
                 </div>
                 <div className="flex gap-2 sm:gap-3">
-                  <Button variant="outline" className="flex-1 sm:flex-none text-sm">Filter by Date</Button>
+                  <Select value={filters.grade} onValueChange={(value) => setFilters(prev => ({ ...prev, grade: value }))}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Grade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All Grades</SelectItem>
+                      <SelectItem value="AA">Grade AA</SelectItem>
+                      <SelectItem value="A">Grade A</SelectItem>
+                      <SelectItem value="B">Grade B</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input 
+                    type="date" 
+                    className="w-40" 
+                    value={filters.date}
+                    onChange={(e) => setFilters(prev => ({ ...prev, date: e.target.value }))}
+                  />
                   <Button variant="outline" className="flex-1 sm:flex-none text-sm">Export Report</Button>
                 </div>
               </div>
@@ -164,22 +194,39 @@ export default function EggCollection() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {collectionData.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell className="font-medium whitespace-nowrap">{record.id}</TableCell>
-                          <TableCell className="whitespace-nowrap">{record.date}</TableCell>
-                          <TableCell className="whitespace-nowrap">{record.shift}</TableCell>
-                          <TableCell className="whitespace-nowrap">{record.pen}</TableCell>
-                          <TableCell className="font-medium whitespace-nowrap">{record.quantity}</TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            <Badge className={getGradeColor(record.grade)}>
-                              Grade {record.grade}
-                            </Badge>
+                      {collectionLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8">
+                            <div className="flex items-center justify-center">
+                              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                              Loading collections...
+                            </div>
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">{record.weight}</TableCell>
-                          <TableCell className="whitespace-nowrap">{record.collector}</TableCell>
                         </TableRow>
-                      ))}
+                      ) : collectionData && collectionData.length > 0 ? (
+                        collectionData.map((record: any) => (
+                          <TableRow key={record.id}>
+                            <TableCell className="font-medium whitespace-nowrap">{record.id}</TableCell>
+                            <TableCell className="whitespace-nowrap">{record.date}</TableCell>
+                            <TableCell className="whitespace-nowrap">{record.shift}</TableCell>
+                            <TableCell className="whitespace-nowrap">{record.pen}</TableCell>
+                            <TableCell className="font-medium whitespace-nowrap">{record.quantity}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              <Badge className={getGradeColor(record.grade)}>
+                                Grade {record.grade}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">{record.weight}</TableCell>
+                            <TableCell className="whitespace-nowrap">{record.collector}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                            No egg collections found. Try adjusting your filters or record a new collection.
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -319,24 +366,30 @@ export default function EggCollection() {
               Cancel
             </Button>
             <Button 
-              onClick={() => {
-                // Here you would typically save the data
-                console.log('Recording collection:', newCollection)
-                setRecordCollectionDialogOpen(false)
-                setNewCollection({
-                  date: new Date().toISOString().split('T')[0],
-                  shift: "",
-                  pen: "",
-                  quantity: "",
-                  grade: "",
-                  avgWeight: "",
-                  collector: "",
-                  notes: ""
+              onClick={async () => {
+                const success = await recordCollection({
+                  ...newCollection,
+                  quantity: parseInt(newCollection.quantity)
                 })
+                if (success) {
+                  setRecordCollectionDialogOpen(false)
+                  setNewCollection({
+                    date: new Date().toISOString().split('T')[0],
+                    shift: "",
+                    pen: "",
+                    quantity: "",
+                    grade: "",
+                    avgWeight: "",
+                    collector: "",
+                    notes: ""
+                  })
+                  refetchCollections()
+                }
               }}
+              disabled={actionLoading}
               className="w-full sm:w-auto order-1 sm:order-2"
             >
-              Record Collection
+              {actionLoading ? "Recording..." : "Record Collection"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -26,6 +26,7 @@ const navigation = [
   { name: "Egg Collection", href: "/eggs", icon: Egg },
   { name: "Medicine & Vaccines", href: "/medicine", icon: Syringe },
   { name: "Reports", href: "/reports", icon: FileText },
+  { name: "Statistics", href: "/statistics", icon: BarChart3 },
   { name: "User Management", href: "/users", icon: Users },
   { name: "Profile", href: "/profile", icon: User },
 ]

@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Bird } from "lucide-react"
 import { LoginForm } from "./LoginForm"
+import { ApiStatus } from "./ApiStatus"
 
 export function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
@@ -45,7 +46,10 @@ export function AuthPage() {
         </div>
 
         {/* Right side - Auth Form */}
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-full max-w-md">
+            <ApiStatus apiUrl={import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"} />
+          </div>
           {isLogin ? (
             <LoginForm onToggleMode={() => setIsLogin(false)} />
           ) : null}

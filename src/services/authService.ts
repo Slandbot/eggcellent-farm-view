@@ -1,116 +1,221 @@
 import { User, LoginCredentials, RegisterData, UserRole } from "@/types/auth"
 
-// Mock users database
-const MOCK_USERS: User[] = [
-  {
-    id: "1",
-    name: "John Smith",
-    email: "admin@farm.com",
-    role: "Admin",
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
-    createdAt: "2024-01-15T08:00:00Z",
-    lastLogin: new Date().toISOString()
-  },
-  {
-    id: "2", 
-    name: "Sarah Johnson",
-    email: "manager@farm.com",
-    role: "Farm Manager",
-    avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
-    createdAt: "2024-02-01T09:30:00Z",
-    lastLogin: new Date().toISOString()
-  },
-  {
-    id: "3",
-    name: "Mike Wilson", 
-    email: "worker@farm.com",
-    role: "Worker",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
-    createdAt: "2024-02-15T07:00:00Z",
-    lastLogin: new Date().toISOString()
-  }
-]
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL 
+const AUTH_STORAGE_KEY = "auth"
+const TOKEN_STORAGE_KEY = "token"
+const REFRESH_TOKEN_STORAGE_KEY = "refresh_token"
 
-const AUTH_STORAGE_KEY = "farmtrack_auth"
-const USERS_STORAGE_KEY = "farmtrack_users"
+interface AuthResponse {
+  success: boolean
+  message: string
+  data: {
+    user: {
+      email: string
+      name: string
+      role: string
+      farmId: string
+      isActive: boolean
+      createdAt: any
+      updatedAt: any
+    }
+    token: string
+    refreshToken?: string
+  }
+  timestamp: string
+}
+
+interface ApiError {
+  message: string
+  status: number
+}
 
 class AuthService {
   constructor() {
-    // Initialize mock users in localStorage if not exists
-    if (!localStorage.getItem(USERS_STORAGE_KEY)) {
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(MOCK_USERS))
+    // Enable automatic token refresh
+    this.setupTokenRefresh()
+    console.log('AuthService - Automatic token refresh enabled')
+  }
+
+  private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const token = this.getToken()
+    const url = `${API_BASE_URL}${endpoint}`
+    
+    const config: RequestInit = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...options.headers,
+      },
+      ...options,
+    }
+
+    try {
+      const response = await fetch(url, config)
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Network error' }))
+        throw new Error(errorData.message || `HTTP ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error
+      }
+      throw new Error('An unexpected error occurred')
     }
   }
 
-  private getUsers(): User[] {
-    const users = localStorage.getItem(USERS_STORAGE_KEY)
-    return users ? JSON.parse(users) : MOCK_USERS
+  getToken(): string | null {
+    return localStorage.getItem(TOKEN_STORAGE_KEY)
   }
 
-  private saveUsers(users: User[]): void {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users))
+  private getRefreshToken(): string | null {
+    return localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY)
   }
 
-  private generateId(): string {
-    return Date.now().toString() + Math.random().toString(36).substr(2, 9)
+  private setTokens(token: string, refreshToken: string): void {
+    localStorage.setItem(TOKEN_STORAGE_KEY, token)
+    localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken)
+  }
+
+  private clearTokens(): void {
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
+    localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY)
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+  }
+
+  // Check if a JWT token is expired
+  private isTokenExpired(token: string): boolean {
+    try {
+      // Split the token and get the payload
+      const payload = token.split('.')[1];
+      if (!payload) return true;
+      
+      // Decode the base64 payload
+      const decodedPayload = JSON.parse(atob(payload));
+      
+      // Check if the token has an expiration time
+      if (!decodedPayload.exp) return false;
+      
+      // Compare expiration time with current time
+      const expirationTime = decodedPayload.exp * 1000; // Convert to milliseconds
+      const currentTime = Date.now();
+      
+      return currentTime >= expirationTime;
+    } catch (error) {
+      console.error('Error checking token expiration:', error);
+      return true; // Assume expired if there's an error
+    }
+  }
+
+  private setupTokenRefresh(): void {
+    // Check token immediately on startup
+    this.checkAndRefreshToken();
+    
+    // Auto-refresh token when it's about to expire (every 5 minutes)
+    setInterval(() => this.checkAndRefreshToken(), 5 * 60 * 1000);
+  }
+  
+  private async checkAndRefreshToken(): Promise<void> {
+    const token = this.getToken();
+    const refreshToken = this.getRefreshToken();
+    
+    console.log('TokenRefresh - Checking tokens:', { hasToken: !!token, hasRefreshToken: !!refreshToken });
+    
+    if (!token || !refreshToken) {
+      console.log('TokenRefresh - Missing tokens, skipping refresh');
+      return;
+    }
+    
+    // Check if token is expired or about to expire (within 10 minutes)
+    const isExpired = this.isTokenExpired(token);
+    
+    if (isExpired) {
+      console.log('TokenRefresh - Token is expired, attempting refresh');
+      try {
+        await this.refreshToken();
+        console.log('TokenRefresh - Token refreshed successfully');
+      } catch (error) {
+        console.error('TokenRefresh - Failed:', error);
+        // Only logout if we're sure the refresh token is invalid
+        // Don't logout on network errors or temporary issues
+        if (error instanceof Error && error.message.includes('refresh token')) {
+          console.log('TokenRefresh - Invalid refresh token, logging out');
+          this.logout().catch(err => console.error('Logout failed:', err));
+        } else {
+          console.log('TokenRefresh - Network/temporary error, keeping user logged in');
+        }
+      }
+    } else {
+      console.log('TokenRefresh - Token is still valid, no refresh needed');
+    }
   }
 
   async login(credentials: LoginCredentials): Promise<User> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    try {
+      const response = await this.makeRequest<AuthResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials),
+      })
 
-    const users = this.getUsers()
-    const user = users.find(u => u.email === credentials.email)
+      // Transform backend user data to frontend User format
+      const user: User = {
+        id: response.data.user.farmId,
+        name: response.data.user.name,
+        email: response.data.user.email,
+        role: response.data.user.role === 'SUPER_ADMIN' ? 'Admin' : response.data.user.role as UserRole,
+        createdAt: new Date(response.data.user.createdAt._seconds ? response.data.user.createdAt._seconds * 1000 : Date.now()).toISOString(),
+        lastLogin: new Date().toISOString()
+      }
 
-    if (!user) {
-      throw new Error("User not found")
+      // Store tokens and user data
+      this.setTokens(response.data.token, response.data.refreshToken || '')
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user))
+      
+      return user
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Login failed')
     }
-
-    // In a real app, you'd verify the password hash
-    if (credentials.password !== "password123") {
-      throw new Error("Invalid password")
-    }
-
-    // Update last login
-    user.lastLogin = new Date().toISOString()
-    this.saveUsers(users)
-
-    // Store session
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user))
-    
-    return user
   }
 
   async register(data: RegisterData): Promise<User> {
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    try {
+      const response = await this.makeRequest<AuthResponse>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      })
 
-    const users = this.getUsers()
-    
-    // Check if email already exists
-    if (users.find(u => u.email === data.email)) {
-      throw new Error("Email already registered")
+      // Transform backend user data to frontend User format
+      const user: User = {
+        id: response.data.user.farmId,
+        name: response.data.user.name,
+        email: response.data.user.email,
+        role: response.data.user.role === 'SUPER_ADMIN' ? 'Admin' : response.data.user.role as UserRole,
+        createdAt: new Date(response.data.user.createdAt._seconds ? response.data.user.createdAt._seconds * 1000 : Date.now()).toISOString(),
+        lastLogin: new Date().toISOString()
+      }
+
+      // Store tokens and user data
+      this.setTokens(response.data.token, response.data.refreshToken || '')
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user))
+      
+      return user
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Registration failed')
     }
-
-    const newUser: User = {
-      id: this.generateId(),
-      name: data.name,
-      email: data.email,
-      role: data.role,
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString()
-    }
-
-    users.push(newUser)
-    this.saveUsers(users)
-    
-    // Store session
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser))
-    
-    return newUser
   }
 
-  logout(): void {
-    localStorage.removeItem(AUTH_STORAGE_KEY)
+  async logout(): Promise<void> {
+    try {
+      await this.makeRequest('/auth/logout', {
+        method: 'POST',
+      })
+    } catch (error) {
+      console.error('Logout request failed:', error)
+    } finally {
+      this.clearTokens()
+    }
   }
 
   getCurrentUser(): User | null {
@@ -118,44 +223,164 @@ class AuthService {
     return userJson ? JSON.parse(userJson) : null
   }
 
-  async updateUser(updates: Partial<User>): Promise<User> {
-    const currentUser = this.getCurrentUser()
-    if (!currentUser) {
-      throw new Error("No user logged in")
+  async refreshToken(): Promise<void> {
+    const refreshToken = this.getRefreshToken()
+    console.log('RefreshToken - Has refresh token:', !!refreshToken)
+    
+    if (!refreshToken) {
+      throw new Error('No refresh token available')
     }
 
-    const users = this.getUsers()
-    const userIndex = users.findIndex(u => u.id === currentUser.id)
+    try {
+      console.log('RefreshToken - Making request to /auth/refresh-token')
+      const response = await this.makeRequest<AuthResponse>('/auth/refresh-token', {
+        method: 'POST',
+        body: JSON.stringify({ refreshToken }),
+      })
+
+      console.log('RefreshToken - Response received, updating tokens')
+      
+      // Transform backend user data to frontend User format
+      const user: User = {
+        id: response.data.user.farmId,
+        name: response.data.user.name,
+        email: response.data.user.email,
+        role: response.data.user.role === 'SUPER_ADMIN' ? 'Admin' : response.data.user.role as UserRole,
+        createdAt: new Date(response.data.user.createdAt._seconds ? response.data.user.createdAt._seconds * 1000 : Date.now()).toISOString(),
+        lastLogin: new Date().toISOString()
+      }
+
+      this.setTokens(response.data.token, response.data.refreshToken || '')
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user))
+      console.log('RefreshToken - Tokens updated successfully')
+    } catch (error) {
+      console.log('RefreshToken - Error occurred:', error)
+      this.clearTokens()
+      throw new Error('Token refresh failed')
+    }
+  }
+
+  async verifyToken(): Promise<boolean> {
+    const token = this.getToken()
     
-    if (userIndex === -1) {
-      throw new Error("User not found")
+    if (!token) {
+      return false
+    }
+    
+    try {
+      await this.makeRequest('/auth/verify-token')
+      return true
+    } catch (error) {
+      // Token verification failed - likely expired or invalid
+      return false
+    }
+  }
+
+  async getProfile(): Promise<User> {
+    try {
+      const user = await this.makeRequest<User>('/auth/profile')
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user))
+      return user
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to get profile')
+    }
+  }
+
+  async updateProfile(updates: Partial<User>): Promise<User> {
+    try {
+      const updatedUser = await this.makeRequest<User>('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      })
+      
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser))
+      return updatedUser
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to update profile')
+    }
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    try {
+      await this.makeRequest('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      })
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to change password')
+    }
+  }
+
+  async revokeToken(userId: string): Promise<void> {
+    try {
+      await this.makeRequest('/auth/revoke-token', {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      })
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to revoke token')
+    }
+  }
+
+  // Helper method to check if user is authenticated
+  isAuthenticated(): boolean {
+    const token = this.getToken()
+    const user = this.getCurrentUser()
+    return !!(token && user)
+  }
+
+  // Helper method to check if user has specific role
+  hasRole(role: UserRole): boolean {
+    const user = this.getCurrentUser()
+    return user?.role === role
+  }
+
+  // Helper method to check if user is admin
+  isAdmin(): boolean {
+    return this.hasRole('Admin')
+  }
+
+  // Initialize authentication state on app start
+  async initializeAuth(): Promise<User | null> {
+    const token = this.getToken()
+    
+    if (!token) {
+      console.log('No authentication token found - user needs to log in')
+      return null
     }
 
-    const updatedUser = { ...users[userIndex], ...updates }
-    users[userIndex] = updatedUser
-    this.saveUsers(users)
-    
-    // Update session
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser))
-    
-    return updatedUser
-  }
+    // Check if this is an old mock token and clear it
+    if (token.startsWith('dev_mode_token_') || token.startsWith('mock_')) {
+      console.log('Clearing old mock authentication token')
+      this.clearTokens()
+      return null
+    }
 
-  getAllUsers(): User[] {
-    return this.getUsers()
-  }
-
-  async deleteUser(userId: string): Promise<void> {
-    const users = this.getUsers()
-    const filteredUsers = users.filter(u => u.id !== userId)
-    this.saveUsers(filteredUsers)
-  }
-
-  switchRole(role: UserRole): void {
-    const currentUser = this.getCurrentUser()
-    if (currentUser) {
-      currentUser.role = role
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser))
+    try {
+      // First try to verify the token
+      const isValid = await this.verifyToken()
+      
+      if (!isValid) {
+        console.log('Token is invalid, attempting to refresh')
+        // Try to refresh the token if verification fails
+        try {
+          await this.refreshToken()
+          console.log('Token refreshed successfully')
+        } catch (refreshError) {
+          console.log('Token refresh failed:', refreshError)
+          this.clearTokens()
+          return null
+        }
+      }
+      
+      // Get user profile with the current token (original or refreshed)
+      const profile = await this.getProfile()
+      console.log('User authenticated successfully:', profile.email)
+      return profile
+    } catch (error) {
+      console.log('Authentication verification failed:', error)
+      this.clearTokens()
+      return null
     }
   }
 }

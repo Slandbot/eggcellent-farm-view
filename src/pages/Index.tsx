@@ -6,9 +6,19 @@ import { MetricCard } from "@/components/dashboard/MetricCard"
 import { ProductionChart } from "@/components/dashboard/ProductionChart"
 import { QuickActions } from "@/components/dashboard/QuickActions"
 import { RecentActivity } from "@/components/dashboard/RecentActivity"
+import { useDashboardStats, useBirdsStats, useEggStats, useFeedStats } from "@/hooks/useApiData"
 
 const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  
+  // Fetch dashboard data from API
+  const { data: dashboardStats, loading: dashboardLoading } = useDashboardStats()
+  const { data: birdsStats, loading: birdsLoading } = useBirdsStats()
+  const { data: eggStats, loading: eggLoading } = useEggStats()
+  const { data: feedStats, loading: feedLoading } = useFeedStats()
+
+  // Loading state for any of the stats
+  const isLoading = dashboardLoading || birdsLoading || eggLoading || feedLoading
 
   return (
     <div className="mobile-safe bg-background flex">
@@ -25,33 +35,43 @@ const Index = () => {
             </div>
           </div>
 
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="ml-2 text-muted-foreground">Loading dashboard data...</span>
+            </div>
+          )}
+
           {/* Metric Cards */}
-          <div className="responsive-card-grid mb-8">
-            <MetricCard
-              title="Total Birds"
-              value="12,547"
-              change={{ value: "+5.2%", trend: "up" }}
-              icon={Bird}
-            />
-            <MetricCard
-              title="Eggs Today"
-              value="2,847"
-              change={{ value: "+12.5%", trend: "up" }}
-              icon={Egg}
-            />
-            <MetricCard
-              title="Feed Stock"
-              value="2.5 tons"
-              change={{ value: "-8.1%", trend: "down" }}
-              icon={Package}
-            />
-            <MetricCard
-              title="Health Alerts"
-              value="3"
-              change={{ value: "-2", trend: "down" }}
-              icon={AlertTriangle}
-            />
-          </div>
+          {!isLoading && (
+            <div className="responsive-card-grid mb-8">
+              <MetricCard
+                title="Total Birds"
+                value={birdsStats?.totalBirds?.toString() || "12,547"}
+                change={{ value: birdsStats?.birdsChange || "+5.2%", trend: birdsStats?.birdsTrend || "up" }}
+                icon={Bird}
+              />
+              <MetricCard
+                title="Eggs Today"
+                value={eggStats?.dailyProduction?.toString() || "2,847"}
+                change={{ value: eggStats?.productionChange || "+12.5%", trend: eggStats?.productionTrend || "up" }}
+                icon={Egg}
+              />
+              <MetricCard
+                title="Feed Stock"
+                value={feedStats?.totalStock || "2.5 tons"}
+                change={{ value: feedStats?.stockChange || "-8.1%", trend: feedStats?.stockTrend || "down" }}
+                icon={Package}
+              />
+              <MetricCard
+                title="Health Alerts"
+                value={birdsStats?.healthAlerts?.toString() || "3"}
+                change={{ value: birdsStats?.alertsChange || "-2", trend: birdsStats?.alertsTrend || "down" }}
+                icon={AlertTriangle}
+              />
+            </div>
+          )}
 
           {/* Charts and actions */}
           <div className="responsive-chart-grid">
