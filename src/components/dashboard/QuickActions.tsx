@@ -55,55 +55,51 @@ export function QuickActions() {
   return (
     <div className="chart-container">
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-foreground">Quick Actions</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-1">Quick Actions</h3>
         <p className="text-sm text-muted-foreground">Common daily tasks</p>
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {actions.map((action) => {
           const Icon = action.icon
           const hasAccess = hasPermission(action.permission)
           
           return (
-            <Button
+            <button
               key={action.label}
-              variant={action.variant}
-              className={`h-auto p-3 sm:p-4 flex-col items-start text-left justify-start gap-2 hover:scale-[1.02] transition-transform ${
-                !hasAccess ? "opacity-50 cursor-not-allowed" : ""
-              }`}
               onClick={action.onClick}
               disabled={!hasAccess}
+              className={`group relative overflow-hidden rounded-xl border bg-card p-4 text-left transition-all duration-300 hover:shadow-md hover:scale-[1.02] ${
+                !hasAccess ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+              } ${
+                action.variant === 'default'
+                  ? 'border-primary/20 bg-gradient-to-br from-primary/5 via-primary/2 to-transparent'
+                  : 'hover:border-primary/30'
+              }`}
             >
-              <div className="flex items-center gap-2 sm:gap-3 w-full">
-                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center ${
-                  action.variant === 'default' 
-                    ? 'bg-primary-foreground/20' 
-                    : 'bg-primary/10'
+              {action.variant === 'default' && (
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              )}
+              <div className="relative flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 ${
+                  action.variant === 'default'
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-muted text-foreground'
                 }`}>
-                  <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${
-                    action.variant === 'default' 
-                      ? 'text-primary-foreground' 
-                      : 'text-primary'
-                  }`} />
+                  <Icon className="w-6 h-6" />
                 </div>
-                <div className="flex-1">
-                  <div className={`font-medium text-sm sm:text-base ${
-                    action.variant === 'default' 
-                      ? 'text-primary-foreground' 
-                      : 'text-foreground'
+                <div className="flex-1 min-w-0">
+                  <div className={`font-semibold text-sm mb-1 ${
+                    action.variant === 'default' ? 'text-primary' : 'text-foreground'
                   }`}>
                     {action.label}
                   </div>
-                  <div className={`text-xs leading-tight ${
-                    action.variant === 'default' 
-                      ? 'text-primary-foreground/70' 
-                      : 'text-muted-foreground'
-                  }`}>
+                  <div className="text-xs text-muted-foreground leading-tight">
                     {action.description}
                   </div>
                 </div>
               </div>
-            </Button>
+            </button>
           )
         })}
       </div>

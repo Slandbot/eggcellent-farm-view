@@ -1,4 +1,5 @@
 import { authService } from './authService'
+import { parseApiError, withTimeout, retryWithBackoff, isRetryableError, ErrorType } from '@/utils/errorHandler'
 import type {
   DashboardStats,
   DailyStats,
@@ -26,100 +27,206 @@ import type {
   ExportReportRequest
 } from '../types/api'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+const REQUEST_TIMEOUT = 30000 // 30 seconds
 
-// Base API service class
+// Global abort controller per request (optional, for cancellation)
+interface RequestOptions extends RequestInit {
+  signal?: AbortSignal
+  retryOn401?: boolean
+}
+
+/**
+ * Base API service – thin wrapper around authService.makeRequest
+ * All 401 handling, token refresh, queueing is in AuthService
+ */
 class BaseApiService {
-  protected async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = authService.getToken()
-    const url = `${API_BASE_URL}${endpoint}`
-    
-    const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-      ...options,
-    }
-
+  protected async request<T>(
+    endpoint: string,
+    options: RequestOptions = {},
+    retryOn401 = true
+  ): Promise<T> {
     try {
-      const response = await fetch(url, config)
+    // Let AuthService handle everything: token, refresh, 401 retry, queue
+    // Don't set headers here - let authService.makeRequest handle Authorization header
+    const response = await authService.makeRequest<any>(endpoint, {
+      ...options,
+      // Only pass custom headers if they exist, authService will merge them properly
+      ...(options.headers && { headers: options.headers }),
+    })
+    
+      // Debug logging in development
+      if (import.meta.env.DEV) {
+        console.log(`[API Response] ${endpoint}:`, {
+          type: Array.isArray(response) ? 'array' : typeof response,
+          keys: typeof response === 'object' && response !== null ? Object.keys(response) : null,
+          preview: Array.isArray(response) 
+            ? `Array(${response.length})` 
+            : typeof response === 'object' && response !== null
+            ? JSON.stringify(response).substring(0, 200)
+            : response
+        })
+      }
       
-      if (!response.ok) {
-        // Handle 401 Unauthorized errors
-        if (response.status === 401) {
-          console.log('Received 401 error, attempting token refresh')
-          
-          // Try to refresh the token
-          try {
-            await authService.refreshToken()
-            
-            // Get the new token and retry the request
-            const newToken = authService.getToken()
-            if (newToken) {
-              const newConfig = {
-                ...config,
-                headers: {
-                  ...config.headers,
-                  Authorization: `Bearer ${newToken}`
-                }
-              }
-              
-              const retryResponse = await fetch(url, newConfig)
-              if (retryResponse.ok) {
-                return await retryResponse.json()
-              }
-              
-              // If retry still fails, handle as normal error
-              const retryErrorData = await retryResponse.json().catch(() => ({ message: 'Network error after token refresh' }))
-              throw new Error(retryErrorData.message || `HTTP ${retryResponse.status} after token refresh`)
+      // Robust API response unwrapping - handle multiple response formats
+      if (response === null || response === undefined) {
+        return response as T
+      }
+      
+      // If response is not an object, return as-is (string, number, boolean, etc.)
+      if (typeof response !== 'object') {
+        return response as T
+      }
+      
+      // Handle array responses directly
+      if (Array.isArray(response)) {
+        return response as T
+      }
+      
+      // Handle wrapped responses with various structures
+      // Format 1: { success: true, data: T } or { success: false, data: T }
+      if ('success' in response && 'data' in response) {
+        const dataValue = response.data
+        if (dataValue !== null && dataValue !== undefined) {
+          // Handle nested structure: { success: true, data: { data: [...], pagination: {...} } }
+          // If dataValue is an object with a 'data' property that's an array, extract it
+          if (typeof dataValue === 'object' && !Array.isArray(dataValue) && 'data' in dataValue) {
+            const nestedData = (dataValue as any).data
+            // If nested data is an array, return it (for array responses like medicine inventory)
+            if (Array.isArray(nestedData)) {
+              return nestedData as T
             }
-          } catch (refreshError) {
-            console.error('Token refresh failed:', refreshError)
-            // Dispatch auth error event
-            const authErrorEvent = new CustomEvent('auth-error', {
-              detail: { message: 'Authentication expired' }
-            });
-            window.dispatchEvent(authErrorEvent);
-            
-            // Force logout on token refresh failure
-            await authService.logout()
-            throw new Error('Authentication expired. Please log in again.')
+            // Otherwise return the whole dataValue object (for object responses like stats)
+          }
+          // If data is an array or object, it's likely the main payload
+          if (Array.isArray(dataValue) || (typeof dataValue === 'object' && Object.keys(dataValue).length > 0)) {
+            return dataValue as T
+          }
+          // Even if it's a primitive, return it if it's the only meaningful field
+          if (typeof dataValue !== 'object') {
+            return dataValue as T
           }
         }
-        
-        const errorData = await response.json().catch(() => ({ message: 'Network error' }))
-        throw new Error(errorData.message || `HTTP ${response.status}`)
+        return response.data as T
       }
-
-      return await response.json()
+    
+      // Format 2: { data: T } (with or without other fields like message, timestamp)
+      if ('data' in response) {
+        // Check if data is the primary payload (not just a metadata field)
+        const dataValue = response.data
+        if (dataValue !== null && dataValue !== undefined) {
+          // Handle nested structure: { data: { data: [...], pagination: {...} } }
+          // If dataValue is an object with a 'data' property that's an array, extract it
+          if (typeof dataValue === 'object' && !Array.isArray(dataValue) && 'data' in dataValue) {
+            const nestedData = (dataValue as any).data
+            // If nested data is an array, return it (for array responses)
+            if (Array.isArray(nestedData)) {
+              return nestedData as T
+            }
+            // Otherwise return the whole dataValue object (for object responses)
+          }
+          // If data is an array or object, it's likely the main payload
+          if (Array.isArray(dataValue) || (typeof dataValue === 'object' && Object.keys(dataValue).length > 0)) {
+            return dataValue as T
+          }
+          // Even if it's a primitive, return it if it's the only meaningful field
+          if (typeof dataValue !== 'object') {
+            return dataValue as T
+          }
+        }
+      }
+      
+      // Format 3: { result: T }
+      if ('result' in response) {
+        const resultValue = response.result
+        if (resultValue !== null && resultValue !== undefined) {
+          return resultValue as T
+        }
+      }
+      
+      // Format 4: { items: T[] } for array responses
+      if ('items' in response && Array.isArray(response.items)) {
+        return response.items as T
+      }
+      
+      // Format 5: { results: T[] } for array responses
+      if ('results' in response && Array.isArray(response.results)) {
+        return response.results as T
+      }
+      
+      // Format 6: { records: T[] } for array responses
+      if ('records' in response && Array.isArray(response.records)) {
+        return response.records as T
+      }
+    
+      // If none of the above, return the response as-is (might be direct object)
+      const finalResponse = response as T
+      
+      // Debug logging in development
+      if (import.meta.env.DEV) {
+        console.log(`[API Unwrapped] ${endpoint}:`, {
+          type: Array.isArray(finalResponse) ? 'array' : typeof finalResponse,
+          preview: Array.isArray(finalResponse)
+            ? `Array(${finalResponse.length})`
+            : typeof finalResponse === 'object' && finalResponse !== null
+            ? JSON.stringify(finalResponse).substring(0, 200)
+            : finalResponse
+        })
+      }
+      
+      return finalResponse
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
+      // Enhanced error logging
+      if (import.meta.env.DEV) {
+        console.error(`[API Error] ${endpoint}:`, error)
       }
-      throw new Error('An unexpected error occurred')
+      throw error
     }
+  }
+
+  // Helper: GET with query params
+  protected get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
+    const searchParams = params ? new URLSearchParams(params as Record<string, string>).toString() : ''
+    const url = searchParams ? `${endpoint}?${searchParams}` : endpoint
+    return this.request<T>(url)
+  }
+
+  // Helper: POST
+  protected post<T>(endpoint: string, data?: any): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    })
+  }
+
+  // Helper: PUT
+  protected put<T>(endpoint: string, data?: any): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    })
+  }
+
+  // Helper: DELETE
+  protected delete<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, { method: 'DELETE' })
   }
 }
 
-// Birds Management Service
+// ──────────────────────────────────────────────────────────────────────────────
+// Individual Services (clean, no auth logic)
+// ──────────────────────────────────────────────────────────────────────────────
+
 export class BirdsService extends BaseApiService {
-  async getBirds(filters?: { status?: string; breed?: string; search?: string }) {
-    const params = new URLSearchParams()
-    if (filters?.status) params.append('status', filters.status)
-    if (filters?.breed) params.append('breed', filters.breed)
-    if (filters?.search) params.append('search', filters.search)
-    
-    const queryString = params.toString()
-    return this.makeRequest(`/birds${queryString ? `?${queryString}` : ''}`)
+  getBirds(filters?: { status?: string; breed?: string; search?: string }) {
+    return this.get('/birds', filters)
   }
 
-  async getBird(id: string) {
-    return this.makeRequest(`/birds/${id}`)
+  getBird(id: string) {
+    return this.get(`/birds/${id}`)
   }
 
-  async createBirdGroup(data: {
+  createBirdGroup(data: {
     groupId: string
     breed: string
     count: number
@@ -129,43 +236,28 @@ export class BirdsService extends BaseApiService {
     acquisitionDate: string
     notes?: string
   }) {
-    return this.makeRequest('/birds', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    })
+    return this.post('/birds', data)
   }
 
-  async updateBird(id: string, data: Partial<any>) {
-    return this.makeRequest(`/birds/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    })
+  updateBird(id: string, data: Partial<any>) {
+    return this.put(`/birds/${id}`, data)
   }
 
-  async deleteBird(id: string) {
-    return this.makeRequest(`/birds/${id}`, {
-      method: 'DELETE'
-    })
+  deleteBird(id: string) {
+    return this.delete(`/birds/${id}`)
   }
 
-  async getBirdsStats() {
-    return this.makeRequest('/birds/stats')
+  getBirdsStats() {
+    return this.get('/birds/stats')
   }
 }
 
-// Egg Collection Service
 export class EggService extends BaseApiService {
-  async getEggCollections(filters?: { date?: string; shift?: string; pen?: string }) {
-    const params = new URLSearchParams()
-    if (filters?.date) params.append('date', filters.date)
-    if (filters?.shift) params.append('shift', filters.shift)
-    if (filters?.pen) params.append('pen', filters.pen)
-    
-    const queryString = params.toString()
-    return this.makeRequest(`/eggs${queryString ? `?${queryString}` : ''}`)
+  getEggCollections(filters?: { date?: string; shift?: string; pen?: string }) {
+    return this.get('/eggs', filters)
   }
 
-  async recordEggCollection(data: {
+  recordEggCollection(data: {
     date: string
     shift: string
     pen: string
@@ -175,63 +267,48 @@ export class EggService extends BaseApiService {
     collectedBy: string
     notes?: string
   }) {
-    return this.makeRequest('/eggs', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    })
+    return this.post('/eggs', data)
   }
 
-  async updateEggCollection(id: string, data: Partial<any>) {
-    return this.makeRequest(`/eggs/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    })
+  updateEggCollection(id: string, data: Partial<any>) {
+    return this.put(`/eggs/${id}`, data)
   }
 
-  async deleteEggCollection(id: string) {
-    return this.makeRequest(`/eggs/${id}`, {
-      method: 'DELETE'
-    })
+  deleteEggCollection(id: string) {
+    return this.delete(`/eggs/${id}`)
   }
 
-  async getEggStats() {
-    return this.makeRequest('/eggs/stats')
+  getEggStats() {
+    return this.get('/eggs/stats')
   }
 
-  async getProductionChart(period: string = '7d') {
-    return this.makeRequest(`/eggs/production-chart?period=${period}`)
+  getProductionChart(period: string = '7d') {
+    return this.get(`/eggs/production-chart`, { period })
   }
 }
 
-// Feed Inventory Service
 export class FeedService extends BaseApiService {
-  async getFeedInventory(filters?: { type?: string; status?: string; search?: string }) {
-    const params = new URLSearchParams()
-    if (filters?.type) params.append('type', filters.type)
-    if (filters?.status) params.append('status', filters.status)
-    if (filters?.search) params.append('search', filters.search)
-    
-    const queryString = params.toString()
-    return this.makeRequest(`/feed${queryString ? `?${queryString}` : ''}`)
+  getFeedInventory(filters?: { type?: string; status?: string; search?: string }) {
+    return this.get('/feed', filters)
   }
 
-  async addFeedStock(data: {
+  addFeedStock(data: {
+    name: string
     type: string
     supplier: string
     quantity: number
     unit: string
-    expiryDate: string
-    costPerUnit: number
+    expiryDate?: string
+    costPerUnit?: number
+    location?: string
+    maxCapacity?: number
     batchNumber?: string
     notes?: string
   }) {
-    return this.makeRequest('/feed', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    })
+    return this.post('/feed', data)
   }
 
-  async recordFeedUsage(data: {
+  recordFeedUsage(data: {
     feedId: string
     quantity: number
     pen: string
@@ -239,47 +316,32 @@ export class FeedService extends BaseApiService {
     date: string
     notes?: string
   }) {
-    return this.makeRequest('/feed/usage', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    })
+    return this.post('/feed/usage', data)
   }
 
-  async updateFeedStock(id: string, data: Partial<any>) {
-    return this.makeRequest(`/feed/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    })
+  updateFeedStock(id: string, data: Partial<any>) {
+    return this.put(`/feed/${id}`, data)
   }
 
-  async deleteFeedStock(id: string) {
-    return this.makeRequest(`/feed/${id}`, {
-      method: 'DELETE'
-    })
+  deleteFeedStock(id: string) {
+    return this.delete(`/feed/${id}`)
   }
 
-  async getFeedStats() {
-    return this.makeRequest('/feed/stats')
+  getFeedStats() {
+    return this.get('/feed/stats')
   }
 
-  async getFeedUsageHistory(feedId?: string) {
-    return this.makeRequest(`/feed/usage${feedId ? `?feedId=${feedId}` : ''}`)
+  getFeedUsageHistory(feedId?: string) {
+    return this.get('/feed/usage', feedId ? { feedId } : undefined)
   }
 }
 
-// Medicine & Vaccines Service
 export class MedicineService extends BaseApiService {
-  async getMedicineInventory(filters?: { type?: string; status?: string; search?: string }) {
-    const params = new URLSearchParams()
-    if (filters?.type) params.append('type', filters.type)
-    if (filters?.status) params.append('status', filters.status)
-    if (filters?.search) params.append('search', filters.search)
-    
-    const queryString = params.toString()
-    return this.makeRequest(`/medicine${queryString ? `?${queryString}` : ''}`)
+  getMedicineInventory(filters?: { type?: string; status?: string; search?: string }) {
+    return this.get('/medicine', filters)
   }
 
-  async addMedicine(data: {
+  addMedicine(data: {
     name: string
     type: string
     supplier: string
@@ -289,13 +351,10 @@ export class MedicineService extends BaseApiService {
     batchNumber?: string
     notes?: string
   }) {
-    return this.makeRequest('/medicine', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    })
+    return this.post('/medicine', data)
   }
 
-  async recordTreatment(data: {
+  recordTreatment(data: {
     medicineId: string
     birdGroup: string
     dosage: string
@@ -304,223 +363,202 @@ export class MedicineService extends BaseApiService {
     reason: string
     notes?: string
   }) {
-    return this.makeRequest('/medicine/treatments', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    })
+    return this.post('/medicine/treatments', data)
   }
 
-  async getTreatmentHistory(filters?: { birdGroup?: string; medicine?: string; dateFrom?: string; dateTo?: string }) {
-    const params = new URLSearchParams()
-    if (filters?.birdGroup) params.append('birdGroup', filters.birdGroup)
-    if (filters?.medicine) params.append('medicine', filters.medicine)
-    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom)
-    if (filters?.dateTo) params.append('dateTo', filters.dateTo)
-    
-    const queryString = params.toString()
-    return this.makeRequest(`/medicine/treatments${queryString ? `?${queryString}` : ''}`)
+  getTreatmentHistory(filters?: { birdGroup?: string; medicine?: string; dateFrom?: string; dateTo?: string }) {
+    return this.get('/medicine/treatments', filters)
   }
 
-  async updateMedicine(id: string, data: Partial<any>) {
-    return this.makeRequest(`/medicine/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    })
+  updateMedicine(id: string, data: Partial<any>) {
+    return this.put(`/medicine/${id}`, data)
   }
 
-  async deleteMedicine(id: string) {
-    return this.makeRequest(`/medicine/${id}`, {
-      method: 'DELETE'
-    })
+  deleteMedicine(id: string) {
+    return this.delete(`/medicine/${id}`)
   }
 
-  async getMedicineStats() {
-    return this.makeRequest('/medicine/stats')
+  getMedicineStats() {
+    return this.get('/medicine/stats')
   }
 }
 
-// Statistics Service
 export class StatisticsService extends BaseApiService {
-  // Dashboard Statistics
-  async getDashboardStats(): Promise<DashboardStats> {
-    return this.makeRequest<DashboardStats>('/stats/dashboard')
+  getDashboardStats(): Promise<DashboardStats> {
+    return this.get('/stats/dashboard')
   }
 
-  async getDailyStats(): Promise<DailyStats> {
-    return this.makeRequest<DailyStats>('/stats/daily')
+  getDailyStats(): Promise<DailyStats> {
+    return this.get('/stats/daily')
   }
 
-  async getWeeklyStats(): Promise<WeeklyStats> {
-    return this.makeRequest<WeeklyStats>('/stats/weekly')
+  getWeeklyStats(): Promise<WeeklyStats> {
+    return this.get('/stats/weekly')
   }
 
-  async getMonthlyStats(): Promise<MonthlyStats> {
-    return this.makeRequest<MonthlyStats>('/stats/monthly')
+  getMonthlyStats(): Promise<MonthlyStats> {
+    return this.get('/stats/monthly')
   }
 
-  async getTrends(): Promise<TrendsData> {
-    return this.makeRequest<TrendsData>('/stats/trends')
+  getTrends(): Promise<TrendsData> {
+    return this.get('/stats/trends')
   }
 
-  async getGradeDistribution(): Promise<GradeDistribution> {
-    return this.makeRequest<GradeDistribution>('/stats/grade-distribution')
+  getGradeDistribution(): Promise<GradeDistribution> {
+    return this.get('/stats/grade-distribution')
   }
 
-  async getPenPerformance(): Promise<PenPerformance[]> {
-    return this.makeRequest<PenPerformance[]>('/stats/pen-performance')
+  getPenPerformance(): Promise<PenPerformance[]> {
+    return this.get('/stats/pen-performance')
   }
 
-  async getCollectorPerformance(): Promise<CollectorPerformance[]> {
-    return this.makeRequest<CollectorPerformance[]>('/stats/collector-performance')
+  getCollectorPerformance(): Promise<CollectorPerformance[]> {
+    return this.get('/stats/collector-performance')
   }
 
-  // Egg Production Statistics
-  async getEggProductionStats(): Promise<EggProductionStats> {
-    return this.makeRequest<EggProductionStats>('/stats/eggs/production')
+  getEggProductionStats(): Promise<EggProductionStats> {
+    return this.get('/stats/eggs/production')
   }
 
-  async getProductionTrends(): Promise<ProductionTrends> {
-    return this.makeRequest<ProductionTrends>('/stats/eggs/trends')
+  getProductionTrends(): Promise<ProductionTrends> {
+    return this.get('/stats/eggs/trends')
   }
 
-  async getDailyProductionSummary(): Promise<DailyProductionSummary> {
-    return this.makeRequest<DailyProductionSummary>('/stats/eggs/daily-summary')
+  getDailyProductionSummary(): Promise<DailyProductionSummary> {
+    return this.get('/stats/eggs/daily-summary')
   }
 
-  async getMonthlyProductionSummary(): Promise<MonthlyProductionSummary> {
-    return this.makeRequest<MonthlyProductionSummary>('/stats/eggs/monthly-summary')
+  getMonthlyProductionSummary(): Promise<MonthlyProductionSummary> {
+    return this.get('/stats/eggs/monthly-summary')
   }
 
-  // Financial Statistics
-  async getFinancialSummary(): Promise<FinancialSummary> {
-    return this.makeRequest<FinancialSummary>('/stats/financial/summary')
+  getFinancialSummary(): Promise<FinancialSummary> {
+    return this.get('/stats/financial/summary')
   }
 
-  async getRevenueTrends(): Promise<RevenueTrends> {
-    return this.makeRequest<RevenueTrends>('/stats/financial/revenue-trends')
+  getRevenueTrends(): Promise<RevenueTrends> {
+    return this.get('/stats/financial/revenue-trends')
   }
 
-  async getCostAnalysis(): Promise<CostAnalysis> {
-    return this.makeRequest<CostAnalysis>('/stats/financial/cost-analysis')
+  getCostAnalysis(): Promise<CostAnalysis> {
+    return this.get('/stats/financial/cost-analysis')
   }
 
-  async getProfitMargins(): Promise<ProfitMargins> {
-    return this.makeRequest<ProfitMargins>('/stats/financial/profit-margins')
+  getProfitMargins(): Promise<ProfitMargins> {
+    return this.get('/stats/financial/profit-margins')
   }
 
-  // Performance Statistics
-  async getPerformanceOverview(): Promise<PerformanceOverview> {
-    return this.makeRequest<PerformanceOverview>('/stats/performance/overview')
+  getPerformanceOverview(): Promise<PerformanceOverview> {
+    return this.get('/stats/performance/overview')
   }
 
-  async getEfficiencyMetrics(): Promise<EfficiencyMetrics> {
-    return this.makeRequest<EfficiencyMetrics>('/stats/performance/efficiency')
+  getEfficiencyMetrics(): Promise<EfficiencyMetrics> {
+    return this.get('/stats/performance/efficiency')
   }
 
-  async getProductivityMetrics(): Promise<ProductivityMetrics> {
-    return this.makeRequest<ProductivityMetrics>('/stats/performance/productivity')
+  getProductivityMetrics(): Promise<ProductivityMetrics> {
+    return this.get('/stats/performance/productivity')
   }
 
-  // Comparative Statistics
-  async getComparativePeriod(): Promise<ComparativePeriod> {
-    return this.makeRequest<ComparativePeriod>('/stats/comparative/period')
+  getComparativePeriod(): Promise<ComparativePeriod> {
+    return this.get('/stats/comparative/period')
   }
 
-  async getYearOverYearComparison(): Promise<YearOverYearComparison> {
-    return this.makeRequest<YearOverYearComparison>('/stats/comparative/year-over-year')
+  getYearOverYearComparison(): Promise<YearOverYearComparison> {
+    return this.get('/stats/comparative/year-over-year')
   }
 
-  async getBenchmarkComparison(): Promise<BenchmarkComparison> {
-    return this.makeRequest<BenchmarkComparison>('/stats/comparative/benchmarks')
+  getBenchmarkComparison(): Promise<BenchmarkComparison> {
+    return this.get('/stats/comparative/benchmarks')
   }
 
-  // Export Statistics
-  async exportReport(reportData: ExportReportRequest): Promise<any> {
-    return this.makeRequest('/stats/export/report', {
-      method: 'POST',
-      body: JSON.stringify(reportData)
-    })
+  exportReport(reportData: ExportReportRequest): Promise<any> {
+    return this.post('/stats/export/report', reportData)
   }
 
-  async getReportTemplates(): Promise<ReportTemplate[]> {
-    return this.makeRequest<ReportTemplate[]>('/stats/export/templates')
+  getReportTemplates(): Promise<ReportTemplate[]> {
+    return this.get('/stats/export/templates')
   }
 }
 
-// Reports Service
 export class ReportsService extends BaseApiService {
-  async getDashboardStats() {
-    return this.makeRequest('/reports/dashboard')
+  getDashboardStats() {
+    return this.get('/reports/dashboard')
   }
 
-  async getProductionReport(period: string = '30d') {
-    return this.makeRequest(`/reports/production?period=${period}`)
+  getProductionReport(period: string = '30d') {
+    return this.get('/reports/production', { period })
   }
 
-  async getHealthReport(period: string = '30d') {
-    return this.makeRequest(`/reports/health?period=${period}`)
+  getHealthReport(period: string = '30d') {
+    return this.get('/reports/health', { period })
   }
 
-  async getFeedConsumptionReport(period: string = '30d') {
-    return this.makeRequest(`/reports/feed-consumption?period=${period}`)
+  getFeedConsumptionReport(period: string = '30d') {
+    return this.get('/reports/feed-consumption', { period })
   }
 
-  async getFinancialReport(period: string = '30d') {
-    return this.makeRequest(`/reports/financial?period=${period}`)
+  getFinancialReport(period: string = '30d') {
+    return this.get('/reports/financial', { period })
   }
 
-  async generateReport(type: string, filters: any) {
-    return this.makeRequest('/reports/generate', {
-      method: 'POST',
-      body: JSON.stringify({ type, filters })
-    })
+  generateReport(type: string, filters: any) {
+    return this.post('/reports/generate', { type, filters })
   }
 
-  async exportReport(reportId: string, format: 'pdf' | 'excel' | 'csv') {
-    return this.makeRequest(`/reports/${reportId}/export?format=${format}`, {
-      method: 'GET'
-    })
+  exportReport(reportId: string, format: 'pdf' | 'excel' | 'csv') {
+    return this.get(`/reports/${reportId}/export`, { format })
   }
 }
 
-// Users Service
 export class UsersService extends BaseApiService {
-  async getUsers(filters?: { role?: string; status?: string; search?: string }) {
-    const params = new URLSearchParams()
-    if (filters?.role) params.append('role', filters.role)
-    if (filters?.status) params.append('status', filters.status)
-    if (filters?.search) params.append('search', filters.search)
-    
-    const queryString = params.toString()
-    return this.makeRequest(`/users${queryString ? `?${queryString}` : ''}`)
+  getUsers(filters?: { role?: string; status?: string; search?: string }) {
+    return this.get('/users', filters)
   }
 
-  async getUserStats() {
-    return this.makeRequest('/users/stats')
+  getUser(userId: string) {
+    return this.get(`/users/${userId}`)
   }
 
-  async addUser(userData: any) {
-    return this.makeRequest('/users', {
-      method: 'POST',
-      body: JSON.stringify(userData)
-    })
+  getUserStats() {
+    return this.get('/users/stats')
   }
 
-  async updateUser(userId: string, userData: any) {
-    return this.makeRequest(`/users/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify(userData)
-    })
+  addUser(userData: any) {
+    return this.post('/users', userData)
   }
 
-  async deleteUser(userId: string) {
-    return this.makeRequest(`/users/${userId}`, {
-      method: 'DELETE'
-    })
+  updateUser(userId: string, userData: any) {
+    return this.put(`/users/${userId}`, userData)
+  }
+
+  deleteUser(userId: string) {
+    return this.delete(`/users/${userId}`)
   }
 }
 
-// Export service instances
+export class DashboardService extends BaseApiService {
+  getOverview(): Promise<DashboardStats> {
+    return this.get('/dashboard/overview')
+  }
+
+  getActivity(): Promise<any[]> {
+    return this.get('/dashboard/activity')
+  }
+
+  getPerformance(): Promise<any> {
+    return this.get('/dashboard/performance')
+  }
+
+  getAlerts(): Promise<any[]> {
+    return this.get('/dashboard/alerts')
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Export Instances
+// ──────────────────────────────────────────────────────────────────────────────
+
 export const birdsService = new BirdsService()
 export const eggService = new EggService()
 export const feedService = new FeedService()
@@ -528,8 +566,9 @@ export const medicineService = new MedicineService()
 export const statisticsService = new StatisticsService()
 export const reportsService = new ReportsService()
 export const usersService = new UsersService()
+export const dashboardService = new DashboardService()
 
-// Export all services as default
+// Default export
 export default {
   birds: birdsService,
   eggs: eggService,
@@ -537,5 +576,6 @@ export default {
   medicine: medicineService,
   statistics: statisticsService,
   reports: reportsService,
-  users: usersService
+  users: usersService,
+  dashboard: dashboardService,
 }

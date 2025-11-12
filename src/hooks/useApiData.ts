@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from './use-toast'
+import { useUserRole } from '@/contexts/UserRoleContext'
 import dataServices from '@/services/dataService'
+import { getUserFriendlyMessage, parseApiError, ErrorType } from '@/utils/errorHandler'
 import type {
   BirdsStats, Bird, EggStats, EggCollection, FeedStats, FeedItem,
   MedicineStats, Medicine, DashboardStats, ProductionReport,
@@ -8,31 +10,53 @@ import type {
 } from '@/types/api'
 
 // Generic hook for API data fetching
-export function useApiData<T>(serviceName: keyof typeof dataServices, method: string, params?: any) {
+export function useApiData<T>(serviceName: keyof typeof dataServices, method: string, params?: any, showToast: boolean = true) {
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
+  const { isAuthenticated } = useUserRole()
 
   const fetchData = useCallback(async () => {
+    // Don't fetch if user is not authenticated
+    if (!isAuthenticated) {
+      setLoading(false)
+      setData(null)
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
       const service = dataServices[serviceName] as any
+      
+      if (!service || typeof service[method] !== 'function') {
+        throw new Error(`Service method ${String(serviceName)}.${method} not found`)
+      }
+      
       const result = await service[method](params)
       setData(result)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred'
+      const appError = parseApiError(err)
+      const errorMessage = getUserFriendlyMessage(err)
       setError(errorMessage)
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      
+      // Only show toast for certain error types, or if explicitly requested
+      if (showToast) {
+        // Don't show toast for authentication errors (handled by AuthErrorHandler)
+        if (appError.type !== ErrorType.AUTHENTICATION) {
+          toast({
+            title: 'Error',
+            description: errorMessage,
+            variant: 'destructive',
+            duration: appError.type === ErrorType.NETWORK ? 5000 : 3000
+          })
+        }
+      }
     } finally {
       setLoading(false)
     }
-  }, [serviceName, method, params, toast])
+  }, [serviceName, method, params, toast, showToast, isAuthenticated])
 
   useEffect(() => {
     fetchData()
@@ -64,12 +88,15 @@ export function useBirdActions() {
       })
       return true
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create bird group'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(err)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       return false
     } finally {
       setLoading(false)
@@ -86,12 +113,15 @@ export function useBirdActions() {
       })
       return true
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update bird'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(err)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       return false
     } finally {
       setLoading(false)
@@ -108,12 +138,15 @@ export function useBirdActions() {
       })
       return true
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete bird'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(err)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       return false
     } finally {
       setLoading(false)
@@ -150,12 +183,15 @@ export function useEggActions() {
       })
       return true
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to record collection'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(err)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       return false
     } finally {
       setLoading(false)
@@ -172,12 +208,15 @@ export function useEggActions() {
       })
       return true
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update collection'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(err)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       return false
     } finally {
       setLoading(false)
@@ -214,12 +253,15 @@ export function useFeedActions() {
       })
       return true
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add feed stock'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(err)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       return false
     } finally {
       setLoading(false)
@@ -236,12 +278,15 @@ export function useFeedActions() {
       })
       return true
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to record usage'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(err)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       return false
     } finally {
       setLoading(false)
@@ -250,7 +295,32 @@ export function useFeedActions() {
 
   const addFeedItem = addFeedStock // Alias for backward compatibility
 
-  return { addFeedStock, addFeedItem, recordUsage, loading }
+  const updateFeedStock = async (id: string, data: any) => {
+    try {
+      setLoading(true)
+      await dataServices.feed.updateFeedStock(id, data)
+      toast({
+        title: 'Success',
+        description: 'Feed stock updated successfully'
+      })
+      return true
+    } catch (err) {
+      const errorMessage = getUserFriendlyMessage(err)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return { addFeedStock, addFeedItem, recordUsage, updateFeedStock, loading }
 }
 
 // Medicine & Vaccines Hooks
@@ -280,12 +350,15 @@ export function useMedicineActions() {
       })
       return true
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add medicine'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(err)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       return false
     } finally {
       setLoading(false)
@@ -302,12 +375,15 @@ export function useMedicineActions() {
       })
       return true
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to record treatment'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(err)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       return false
     } finally {
       setLoading(false)
@@ -320,6 +396,22 @@ export function useMedicineActions() {
 // Dashboard & Reports Hooks
 export function useDashboardStats() {
   return useApiData<DashboardStats>('reports', 'getDashboardStats')
+}
+
+export function useDashboardOverview() {
+  return useApiData<DashboardStats>('dashboard', 'getOverview')
+}
+
+export function useDashboardActivity() {
+  return useApiData<any[]>('dashboard', 'getActivity')
+}
+
+export function useDashboardPerformance() {
+  return useApiData<any>('dashboard', 'getPerformance')
+}
+
+export function useDashboardAlerts() {
+  return useApiData<any[]>('dashboard', 'getAlerts')
 }
 
 export function useProductionReport(period: string = '30d') {
@@ -348,12 +440,15 @@ export function useReportActions() {
       })
       return result
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate report'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(err)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       return null
     } finally {
       setLoading(false)
@@ -370,12 +465,15 @@ export function useReportActions() {
       })
       return result
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to export report'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(err)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       return null
     } finally {
       setLoading(false)
@@ -388,6 +486,10 @@ export function useReportActions() {
 // User Management Hooks
 export function useUsers(filters?: { role?: string; status?: string; search?: string }) {
   return useApiData<User[]>('users', 'getUsers', filters)
+}
+
+export function useUser(userId: string) {
+  return useApiData<User>('users', 'getUser', userId)
 }
 
 export function useUserStats() {
@@ -408,12 +510,15 @@ export function useUserActions() {
       })
       return result
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add user'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(error)
+      const appError = parseApiError(error)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       throw error
     } finally {
       setLoading(false)
@@ -430,12 +535,15 @@ export function useUserActions() {
       })
       return result
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update user'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(error)
+      const appError = parseApiError(error)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       throw error
     } finally {
       setLoading(false)
@@ -451,12 +559,15 @@ export function useUserActions() {
         description: 'User deleted successfully'
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete user'
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      const errorMessage = getUserFriendlyMessage(error)
+      const appError = parseApiError(error)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      }
       throw error
     } finally {
       setLoading(false)

@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '@/services/authService';
+import { storage } from '@/utils/errorHandler';
 
 const AuthErrorHandler: React.FC = () => {
   const [showError, setShowError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('Your session has expired or is invalid. Please log in again to continue.');
   const navigate = useNavigate();
 
   useEffect(() => {
     // Listen for authentication errors
     const handleAuthError = (event: CustomEvent) => {
+      const message = event.detail?.message || 'Your session has expired or is invalid. Please log in again to continue.';
+      setErrorMessage(message);
       setShowError(true);
     };
 
@@ -26,13 +30,13 @@ const AuthErrorHandler: React.FC = () => {
     } catch (error) {
       console.error('Logout failed:', error);
     } finally {
-      // Clear any stored tokens
-      localStorage.removeItem('token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('auth');
+      // Clear any stored tokens using safe storage utility
+      storage.removeItem('token');
+      storage.removeItem('refresh_token');
+      storage.removeItem('auth');
       
-      // Redirect to login
-      navigate('/login');
+      // Redirect to home - AppContent will show AuthPage if not authenticated
+      navigate('/');
       setShowError(false);
     }
   };
@@ -44,7 +48,7 @@ const AuthErrorHandler: React.FC = () => {
       <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
         <h2 className="text-xl font-bold text-red-600 mb-4">Authentication Error</h2>
         <p className="mb-4">
-          Your session has expired or is invalid. Please log in again to continue.
+          {errorMessage}
         </p>
         <div className="flex justify-end">
           <button

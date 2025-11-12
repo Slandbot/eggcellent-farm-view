@@ -80,13 +80,21 @@ export interface FeedItem {
   id: string
   name: string
   type: string
-  quantity: number
+  quantity?: number // Legacy field, prefer 'stock'
   unit: string
-  cost: number
+  cost?: number // Total cost
+  costPerUnit?: number // Cost per unit
   supplier: string
-  expiryDate: string
-  status: string
-  stock?: number
+  expiryDate?: string
+  status: string // Calculated: "In Stock" | "Low Stock" | "Out of Stock"
+  stock?: number // Current stock quantity
+  maxCapacity?: number // Maximum storage capacity
+  category?: string // Feed category/classification
+  location?: string // Storage location (e.g., "Warehouse A, Section 2")
+  batchNumber?: string // Batch or lot number
+  notes?: string // Additional notes
+  createdAt?: string // Creation timestamp (ISO format)
+  updatedAt?: string // Last update timestamp (ISO format)
 }
 
 // Medicine API Types
@@ -116,11 +124,16 @@ export interface Medicine {
 // Reports API Types
 export interface DashboardStats {
   totalBirds: number
-  todayEggs: number
-  feedStock: number
-  activeTreatments: number
-  revenue: number
-  expenses: number
+  todayEggCount?: number // API field name
+  todayEggs?: number // Alternative field name
+  activeBirds?: number
+  feedItems?: number // API field name
+  feedStock?: number // Alternative field name
+  lowStockFeed?: number
+  medicineItems?: number
+  activeTreatments?: number
+  revenue?: number
+  expenses?: number
   totalReports?: number
   automatedReports?: number
   dataInsights?: number
@@ -164,7 +177,7 @@ export interface User {
   name: string
   email: string
   phone: string
-  role: 'Admin' | 'Farm Manager' | 'Worker'
+  role: 'Admin' | 'Manager' | 'Worker'
   status: 'active' | 'inactive'
   lastLogin: string
   permissions: string[]

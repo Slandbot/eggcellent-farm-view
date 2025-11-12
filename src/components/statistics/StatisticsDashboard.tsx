@@ -15,6 +15,11 @@ import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Badge } from '../ui/badge'
 import { Loader2, TrendingUp, TrendingDown, Minus, Download, BarChart3, PieChart, LineChart } from 'lucide-react'
+import { TrendsChart } from '../dashboard/TrendsChart'
+import { GradeDistributionChart } from '../dashboard/GradeDistributionChart'
+import { PenPerformanceChart } from '../dashboard/PenPerformanceChart'
+import { FinancialChart } from '../dashboard/FinancialChart'
+import { PerformanceMetricsChart } from '../dashboard/PerformanceMetricsChart'
 
 const StatisticsDashboard: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('monthly')
@@ -84,7 +89,7 @@ const StatisticsDashboard: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Statistics Dashboard</h1>
+          <h1 className="text-3xl font-bold pt-10">Statistics Dashboard</h1>
           <p className="text-gray-600">Comprehensive farm performance analytics</p>
         </div>
         <div className="flex gap-2">
@@ -149,7 +154,7 @@ const StatisticsDashboard: React.FC = () => {
             <LineChart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${dashboardStats?.revenue?.toLocaleString() || 0}</div>
+            <div className="text-2xl font-bold">₵{dashboardStats?.revenue?.toLocaleString() || 0}</div>
           </CardContent>
         </Card>
 
@@ -165,164 +170,19 @@ const StatisticsDashboard: React.FC = () => {
       </div>
 
       {/* Trends Section */}
-      {trends && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Performance Trends</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Egg Production</span>
-                  {getTrendIcon(trends.eggProduction.trend)}
-                </div>
-                <div className="text-2xl font-bold">{trends.eggProduction.current.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">
-                  {trends.eggProduction.change > 0 ? '+' : ''}{trends.eggProduction.change}% from previous period
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Feed Efficiency</span>
-                  {getTrendIcon(trends.feedEfficiency.trend)}
-                </div>
-                <div className="text-2xl font-bold">{trends.feedEfficiency.current.toFixed(2)}</div>
-                <div className="text-sm text-gray-600">
-                  {trends.feedEfficiency.change > 0 ? '+' : ''}{trends.feedEfficiency.change}% from previous period
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Revenue</span>
-                  {getTrendIcon(trends.revenue.trend)}
-                </div>
-                <div className="text-2xl font-bold">${trends.revenue.current.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">
-                  {trends.revenue.change > 0 ? '+' : ''}{trends.revenue.change}% from previous period
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <TrendsChart data={trends} />
 
       {/* Grade Distribution */}
-      {gradeDistribution && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Egg Grade Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-600">{gradeDistribution.gradeA.count.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">Grade A ({gradeDistribution.gradeA.percentage}%)</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-yellow-600">{gradeDistribution.gradeB.count.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">Grade B ({gradeDistribution.gradeB.percentage}%)</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-red-600">{gradeDistribution.cracked.count.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">Cracked ({gradeDistribution.cracked.percentage}%)</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <GradeDistributionChart data={gradeDistribution} />
 
       {/* Pen Performance */}
-      {penPerformance && penPerformance.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Performing Pens</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {penPerformance.slice(0, 5).map((pen) => (
-                <div key={pen.penId} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <div className="font-medium">{pen.penName}</div>
-                    <div className="text-sm text-gray-600">{pen.birdCount} birds</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-medium">{pen.eggProduction.toLocaleString()} eggs</div>
-                    <div className="text-sm text-gray-600">Efficiency: {pen.efficiency}%</div>
-                  </div>
-                  <Badge variant={pen.rank <= 3 ? 'default' : 'secondary'}>
-                    Rank #{pen.rank}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <PenPerformanceChart data={penPerformance} />
 
       {/* Financial Summary */}
-      {financialSummary && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Financial Overview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">${financialSummary.totalRevenue.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">Total Revenue</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">${financialSummary.totalExpenses.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">Total Expenses</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">${financialSummary.netProfit.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">Net Profit</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{financialSummary.profitMargin.toFixed(1)}%</div>
-                <div className="text-sm text-gray-600">Profit Margin</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <FinancialChart data={financialSummary} />
 
       {/* Performance Overview */}
-      {performanceOverview && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Performance Metrics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold">{performanceOverview.overallScore}/100</div>
-                <div className="text-sm text-gray-600">Overall Score</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{performanceOverview.productionEfficiency}%</div>
-                <div className="text-sm text-gray-600">Production Efficiency</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{performanceOverview.feedEfficiency}%</div>
-                <div className="text-sm text-gray-600">Feed Efficiency</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{performanceOverview.healthScore}%</div>
-                <div className="text-sm text-gray-600">Health Score</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{performanceOverview.financialHealth}%</div>
-                <div className="text-sm text-gray-600">Financial Health</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <PerformanceMetricsChart data={performanceOverview} />
     </div>
   )
 }

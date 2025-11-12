@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,7 @@ interface User {
   name: string;
   email: string;
   phone: string;
-  role: 'Admin' | 'Farm Manager' | 'Worker';
+  role: 'Admin' | 'Manager' | 'Worker';
   status: 'active' | 'inactive';
   lastLogin: string;
   permissions: string[];
@@ -35,7 +35,7 @@ interface ActivityLog {
 }
 
 const UserManagement: React.FC = () => {
-  const { userRole } = useUserRole();
+  const { user, userRole, canAccess, isLoading } = useUserRole();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -43,76 +43,120 @@ const UserManagement: React.FC = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [filters, setFilters] = useState({ role: '', status: '', search: '' });
+  const [editUserPassword, setEditUserPassword] = useState('');
   
   // API hooks
-  const { data: apiUsers, loading: usersLoading, refetch: refetchUsers } = useUsers(filters);
-  const { data: userStats, loading: statsLoading } = useUserStats();
-  const { addUser: addUserApi, loading: actionLoading } = useUserActions();
+  const { data: usersData, loading: usersLoading, error: usersError, refetch: refetchUsers } = useUsers(filters);
+  const { data: userStats, loading: statsLoading, error: statsError } = useUserStats();
+  const { addUser: addUserApi, updateUser: updateUserApi, deleteUser: deleteUserApi, loading: actionLoading } = useUserActions();
 
-  // Use API data or fallback to mock data
-  const [users, setUsers] = useState<User[]>(apiUsers || [
-    {
-      id: '1',
-      name: 'John Admin',
-      email: 'john@farm.com',
-      phone: '+233 24 123 4567',
-      role: 'Admin',
-      status: 'active',
-      lastLogin: '2024-01-15 10:30',
-      permissions: ['all']
-    },
-    {
-      id: '2',
-      name: 'Sarah Manager',
-      email: 'sarah@farm.com',
-      phone: '+233 20 987 6543',
-      role: 'Farm Manager',
-      status: 'active',
-      lastLogin: '2024-01-15 09:15',
-      permissions: ['birds', 'feed', 'medicine', 'eggs', 'reports']
-    },
-    {
-      id: '3',
-      name: 'Mike Worker',
-      email: 'mike@farm.com',
-      phone: '+233 55 456 7890',
-      role: 'Worker',
-      status: 'active',
-      lastLogin: '2024-01-15 08:00',
-      permissions: ['feed_record', 'egg_record', 'tasks']
+  // Normalize users data - handle both array and object responses
+  // Note: BaseApiService now unwraps { success, data } responses, so usersData should be the data part
+  const users = useMemo(() => {
+    if (!usersData) {
+      return null
     }
-  ]);
-
-  // Update users when API data changes
-  React.useEffect(() => {
-    if (apiUsers) {
-      setUsers(apiUsers);
+    
+    let usersArray: any[] = []
+    
+    // If it's already an array, use it
+    if (Array.isArray(usersData)) {
+      usersArray = usersData
     }
-  }, [apiUsers]);
-
-  const [activityLogs] = useState<ActivityLog[]>([
-    {
-      id: '1',
-      user: 'John Admin',
-      action: 'Created new user',
-      timestamp: '2024-01-15 10:30',
-      details: 'Added Mike Worker to the system'
-    },
-    {
-      id: '2',
-      user: 'Sarah Manager',
-      action: 'Updated bird batch',
-      timestamp: '2024-01-15 09:15',
-      details: 'Modified batch #B001 information'
-    },
-    {
-      id: '3',
-      user: 'Mike Worker',
-      action: 'Recorded feed usage',
-      timestamp: '2024-01-15 08:00',
-      details: 'Added 50kg feed consumption for Coop A'
+    // If it's an object, check for common array properties
+    else if (usersData && typeof usersData === 'object') {
+      const dataObj = usersData as any
+      
+      // Check for users array (most common)
+      if (Array.isArray(dataObj.users)) {
+        usersArray = dataObj.users
+      }
+      // Check for data array
+      else if (Array.isArray(dataObj.data)) {
+        usersArray = dataObj.data
+      }
+      // Check for results array
+      else if (Array.isArray(dataObj.results)) {
+        usersArray = dataObj.results
+      }
+      // Check for items array (pagination)
+      else if (Array.isArray(dataObj.items)) {
+        usersArray = dataObj.items
+      }
+      // Check for list array
+      else if (Array.isArray(dataObj.list)) {
+        usersArray = dataObj.list
+      }
     }
-  ]);
+    
+    // Helper function to convert Firestore timestamps or date objects to string
+    const formatDate = (dateValue: any): string => {
+      if (!dateValue) return 'Never'
+      
+      // If it's already a string, return it
+      if (typeof dateValue === 'string') {
+        return dateValue
+      }
+      
+      // Handle Firestore timestamp format {_seconds, _nanoseconds}
+      if (dateValue && typeof dateValue === 'object' && '_seconds' in dateValue) {
+        try {
+          const date = new Date(dateValue._seconds * 1000)
+          return date.toLocaleString()
+        } catch {
+          return 'Never'
+        }
+      }
+      
+      // Handle Date object
+      if (dateValue instanceof Date) {
+        return dateValue.toLocaleString()
+      }
+      
+      // Handle timestamp number (seconds or milliseconds)
+      if (typeof dateValue === 'number') {
+        try {
+          // If it's in seconds (less than year 2000 in milliseconds), multiply by 1000
+          const timestamp = dateValue < 946684800000 ? dateValue * 1000 : dateValue
+          const date = new Date(timestamp)
+          return date.toLocaleString()
+        } catch {
+          return 'Never'
+        }
+      }
+      
+      // Handle ISO string or other formats
+      try {
+        const date = new Date(dateValue)
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleString()
+        }
+      } catch {
+        // Fall through to default
+      }
+      
+      return 'Never'
+    }
+    
+    // Normalize user objects to ensure all required fields exist
+    const normalizedUsers = usersArray.map((user: any) => ({
+      id: user.id || user._id || user.userId || '',
+      name: user.name || user.fullName || user.username || 'Unknown',
+      email: user.email || '',
+      phone: user.phone || user.phoneNumber || '',
+      role: user.role || 'Worker',
+      // Handle status - check for isActive, status, or default to 'active'
+      status: user.status || (user.isActive === false ? 'inactive' : 'active'),
+      lastLogin: formatDate(user.lastLogin || user.last_login || user.lastLoginAt || user.createdAt),
+      permissions: user.permissions || user.permission || []
+    }))
+    
+    if (normalizedUsers.length === 0 && usersData) {
+      console.warn('Users data is not in expected format. Expected array or object with users/data/results/items/list property:', usersData)
+    }
+    
+    return normalizedUsers.length > 0 ? normalizedUsers : (usersData ? [] : null)
+  }, [usersData])
 
   const [newUser, setNewUser] = useState({
     name: '',
@@ -125,14 +169,14 @@ const UserManagement: React.FC = () => {
 
   const rolePermissions = {
     Admin: ['all'],
-    'Farm Manager': ['birds', 'feed', 'medicine', 'eggs', 'reports'],
+    Manager: ['birds', 'feed', 'medicine', 'eggs', 'reports'],
     Worker: ['feed_record', 'egg_record', 'tasks']
   };
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'Admin': return 'bg-red-100 text-red-800';
-      case 'Farm Manager': return 'bg-blue-100 text-blue-800';
+      case 'Manager': return 'bg-blue-100 text-blue-800';
       case 'Worker': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -143,33 +187,21 @@ const UserManagement: React.FC = () => {
   };
 
   const handleAddUser = async () => {
-    const success = await addUserApi({
-      name: newUser.name,
-      email: newUser.email,
-      phone: newUser.phone,
-      role: newUser.role,
-      password: newUser.password
-    });
-    
-    if (success) {
-      setNewUser({ name: '', email: '', phone: '', password: '', role: 'Worker', permissions: [] });
-      setIsAddUserOpen(false);
-      refetchUsers();
-    } else {
-      // Fallback to local state update if API fails
-      const user: User = {
-        id: Date.now().toString(),
+    try {
+      await addUserApi({
         name: newUser.name,
         email: newUser.email,
         phone: newUser.phone,
         role: newUser.role,
-        status: 'active',
-        lastLogin: 'Never',
-        permissions: rolePermissions[newUser.role]
-      };
-      setUsers([...users, user]);
+        password: newUser.password
+      });
+      
       setNewUser({ name: '', email: '', phone: '', password: '', role: 'Worker', permissions: [] });
       setIsAddUserOpen(false);
+      refetchUsers();
+    } catch (error) {
+      // Error is already handled by useUserActions hook
+      console.error('Failed to add user:', error);
     }
   };
 
@@ -178,59 +210,80 @@ const UserManagement: React.FC = () => {
     setIsDeleteDialogOpen(true);
   };
 
-  const confirmDeleteUser = () => {
+  const confirmDeleteUser = async () => {
     if (userToDelete) {
-      setUsers(users.filter(user => user.id !== userToDelete));
-      setUserToDelete(null);
+      try {
+        await deleteUserApi(userToDelete);
+        setUserToDelete(null);
+        setIsDeleteDialogOpen(false);
+        refetchUsers();
+      } catch (error) {
+        // Error is already handled by useUserActions hook
+        console.error('Failed to delete user:', error);
+      }
     }
-    setIsDeleteDialogOpen(false);
   };
 
-  const handleEditUser = () => {
+  const handleEditUser = async () => {
     if (selectedUser) {
-      setUsers(users.map(user => 
-        user.id === selectedUser.id ? selectedUser : user
-      ));
-      setSelectedUser(null);
-      setIsEditUserOpen(false);
+      try {
+        const updateData: any = {
+          name: selectedUser.name,
+          email: selectedUser.email,
+          phone: selectedUser.phone,
+          role: selectedUser.role,
+          status: selectedUser.status
+        };
+        
+        // Include password if provided (for admins/managers to set user passwords)
+        if (editUserPassword && editUserPassword.trim()) {
+          updateData.password = editUserPassword;
+        }
+        
+        await updateUserApi(selectedUser.id, updateData);
+        setSelectedUser(null);
+        setIsEditUserOpen(false);
+        setEditUserPassword(''); // Clear password field
+        refetchUsers();
+      } catch (error) {
+        // Error is already handled by useUserActions hook
+        console.error('Failed to update user:', error);
+      }
     }
   };
 
-  const toggleUserStatus = (userId: string) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? { ...user, status: user.status === 'active' ? 'inactive' : 'active' }
-        : user
-    ));
+  const toggleUserStatus = async (userId: string) => {
+    const user = users?.find(u => u.id === userId);
+    if (user) {
+      try {
+        await updateUserApi(userId, {
+          status: user.status === 'active' ? 'inactive' : 'active'
+        });
+        refetchUsers();
+      } catch (error) {
+        // Error is already handled by useUserActions hook
+        console.error('Failed to update user status:', error);
+      }
+    }
   };
 
   // Role-based access control
-  const canManageUsers = userRole === 'Admin';
-  const canViewFinancials = userRole === 'Admin';
-  const canViewActivityLogs = userRole === 'Admin' || userRole === 'Farm Manager';
+  // Use user.role if available, fallback to userRole
+  const currentRole = user?.role || userRole;
+  // Admin has all access - check if user is Admin first
+  const isAdmin = currentRole === 'Admin';
+  const isManager = currentRole === 'Manager';
+  // Admin has all access, so check canAccess for /users page or if Admin
+  const hasAccess = isAdmin || canAccess('/users') || currentRole === 'Manager';
+  const canManageUsers = isAdmin;
+  const canSetPasswords = isAdmin || isManager; // Admins and Managers can set passwords
+  const canViewFinancials = isAdmin;
+  const canViewActivityLogs = isAdmin || currentRole === 'Manager';
 
-  if (!canManageUsers && userRole !== 'Farm Manager') {
-    return (
-      <div className="h-screen overflow-hidden flex bg-gray-50">
-        <AppSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
-        <div className="flex-1 flex flex-col">
-          <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
-          <main className="flex-1 overflow-y-auto p-6">
-            <div className="flex items-center justify-center h-full">
-              <Card className="w-96">
-                <CardHeader className="text-center">
-                  <Shield className="h-12 w-12 mx-auto text-red-500 mb-4" />
-                  <CardTitle>Access Denied</CardTitle>
-                  <CardDescription>
-                    You don't have permission to access user management.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
+  // ProtectedRoute handles redirects, so we just show nothing if no access
+  // Don't render if user doesn't have access (ProtectedRoute will redirect)
+  if (!isLoading && !hasAccess && !isAdmin) {
+    return null
   }
 
   return (
@@ -240,6 +293,15 @@ const UserManagement: React.FC = () => {
         <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         <main className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6">
           <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 min-w-0">
+            {/* Error State */}
+            {(usersError || statsError) && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-4">
+                <p className="text-sm text-destructive">
+                  {usersError || statsError || 'Failed to load user data'}
+                </p>
+              </div>
+            )}
+
             {/* Loading State */}
             {(usersLoading || statsLoading) && (
               <div className="flex items-center justify-center py-8">
@@ -253,7 +315,7 @@ const UserManagement: React.FC = () => {
               <div className="min-w-0 flex-1 px-1 sm:px-0">
                 <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">User Management</h1>
                 <p className="text-xs sm:text-sm lg:text-base text-gray-600 mt-1 line-clamp-2">
-                  {userRole === 'Admin' ? 'Manage users, roles, and system settings' : 'View user information and activity'}
+                  {currentRole === 'Admin' ? 'Manage users, roles, and system settings' : 'View user information and activity'}
                 </p>
               </div>
               {canManageUsers && (
@@ -311,7 +373,13 @@ const UserManagement: React.FC = () => {
                                 </div>
                               </TableCell>
                             </TableRow>
-                          ) : users && users.length > 0 ? (
+                          ) : !users || !Array.isArray(users) || users.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={canManageUsers ? 7 : 6} className="text-center py-8 text-muted-foreground">
+                                {usersError ? 'Failed to load users' : 'No users found'}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
                             users.map((user) => (
                               <TableRow key={user.id}>
                                 <TableCell className="font-medium">
@@ -323,17 +391,17 @@ const UserManagement: React.FC = () => {
                                 <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
                                 <TableCell className="hidden lg:table-cell">{user.phone}</TableCell>
                                 <TableCell>
-                                  <Badge className={getRoleBadgeColor(user.role)}>
-                                    <span className="hidden sm:inline">{user.role.replace('_', ' ').toUpperCase()}</span>
-                                    <span className="sm:hidden">{user.role.charAt(0)}</span>
+                                  <Badge className={getRoleBadgeColor(user.role || 'Worker')}>
+                                    <span className="hidden sm:inline">{(user.role || 'Worker').replace('_', ' ').toUpperCase()}</span>
+                                    <span className="sm:hidden">{(user.role || 'W').charAt(0)}</span>
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="hidden md:table-cell">
-                                  <Badge className={getStatusBadgeColor(user.status)}>
-                                    {user.status.toUpperCase()}
+                                  <Badge className={getStatusBadgeColor(user.status || 'active')}>
+                                    {(user.status || 'active').toUpperCase()}
                                   </Badge>
                                 </TableCell>
-                                <TableCell className="hidden lg:table-cell">{user.lastLogin}</TableCell>
+                                <TableCell className="hidden lg:table-cell">{user.lastLogin || 'Never'}</TableCell>
                                 {canManageUsers && (
                                   <TableCell>
                                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-1 min-w-0">
@@ -372,12 +440,6 @@ const UserManagement: React.FC = () => {
                                 )}
                               </TableRow>
                             ))
-                          ) : (
-                            <TableRow>
-                              <TableCell colSpan={canManageUsers ? 7 : 6} className="text-center py-8 text-muted-foreground">
-                                No users found. Try adjusting your filters or add a new user.
-                              </TableCell>
-                            </TableRow>
                           )}
                         </TableBody>
                         </Table>
@@ -413,14 +475,11 @@ const UserManagement: React.FC = () => {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {activityLogs.map((log) => (
-                              <TableRow key={log.id}>
-                                <TableCell className="font-medium">{log.user}</TableCell>
-                                <TableCell>{log.action}</TableCell>
-                                <TableCell>{log.timestamp}</TableCell>
-                                <TableCell>{log.details}</TableCell>
-                              </TableRow>
-                            ))}
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                Activity logs will be available when the API endpoint is implemented.
+                              </TableCell>
+                            </TableRow>
                           </TableBody>
                           </Table>
                         </div>
@@ -468,7 +527,7 @@ const UserManagement: React.FC = () => {
                             <p className="text-sm text-gray-600">Full system access</p>
                           </div>
                           <div>
-                            <Label className="text-sm font-medium text-blue-600">Farm Manager</Label>
+                            <Label className="text-sm font-medium text-blue-600">Manager</Label>
                             <p className="text-sm text-gray-600">Operations and reports</p>
                           </div>
                           <div>
@@ -581,7 +640,7 @@ const UserManagement: React.FC = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Admin">Admin</SelectItem>
-                      <SelectItem value="Farm Manager">Farm Manager</SelectItem>
+                      <SelectItem value="Manager">Manager</SelectItem>
                       <SelectItem value="Worker">Worker</SelectItem>
                     </SelectContent>
                   </Select>
@@ -646,15 +705,37 @@ const UserManagement: React.FC = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Admin">Admin</SelectItem>
-                        <SelectItem value="Farm Manager">Farm Manager</SelectItem>
+                        <SelectItem value="Manager">Manager</SelectItem>
                         <SelectItem value="Worker">Worker</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+                  {canSetPasswords && (
+                    <div>
+                      <Label htmlFor="edit-password">Set Password (Optional)</Label>
+                      <Input
+                        id="edit-password"
+                        type="password"
+                        value={editUserPassword}
+                        onChange={(e) => setEditUserPassword(e.target.value)}
+                        placeholder="Leave empty to keep existing password"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Set a new password for this user. Leave empty to keep the current password.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
               <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-2 pt-4">
-                <Button variant="outline" onClick={() => setIsEditUserOpen(false)} className="w-full sm:w-auto order-2 sm:order-1">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsEditUserOpen(false)
+                    setEditUserPassword('') // Clear password when canceling
+                  }} 
+                  className="w-full sm:w-auto order-2 sm:order-1"
+                >
                   Cancel
                 </Button>
                 <Button onClick={handleEditUser} className="w-full sm:w-auto order-1 sm:order-2">

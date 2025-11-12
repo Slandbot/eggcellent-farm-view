@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useToast } from './use-toast'
 import { statisticsService } from '../services/dataService'
+import { getUserFriendlyMessage, parseApiError, ErrorType } from '@/utils/errorHandler'
 import {
   DashboardStats,
   DailyStats,
@@ -28,10 +30,11 @@ import {
 } from '../types/api'
 
 // Generic hook for statistics data
-function useStatisticsData<T>(fetchFunction: () => Promise<T>, dependencies: any[] = []) {
+function useStatisticsData<T>(fetchFunction: () => Promise<T>, dependencies: any[] = [], showToast: boolean = false) {
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
   const fetchData = async () => {
     try {
@@ -40,7 +43,19 @@ function useStatisticsData<T>(fetchFunction: () => Promise<T>, dependencies: any
       const result = await fetchFunction()
       setData(result)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      const appError = parseApiError(err)
+      const errorMessage = getUserFriendlyMessage(err)
+      setError(errorMessage)
+      
+      // Show toast if requested and not an authentication error
+      if (showToast && appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive',
+          duration: appError.type === ErrorType.NETWORK ? 5000 : 3000
+        })
+      }
     } finally {
       setLoading(false)
     }
@@ -156,6 +171,7 @@ export const useExportReport = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const { toast } = useToast()
 
   const exportReport = async (reportData: ExportReportRequest) => {
     try {
@@ -164,8 +180,21 @@ export const useExportReport = () => {
       setSuccess(false)
       await statisticsService.exportReport(reportData)
       setSuccess(true)
+      toast({
+        title: 'Success',
+        description: 'Report exported successfully',
+      })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Export failed')
+      const errorMessage = getUserFriendlyMessage(err)
+      setError(errorMessage)
+      const appError = parseApiError(err)
+      if (appError.type !== ErrorType.AUTHENTICATION) {
+        toast({
+          title: 'Export Failed',
+          description: errorMessage,
+          variant: 'destructive',
+        })
+      }
     } finally {
       setLoading(false)
     }

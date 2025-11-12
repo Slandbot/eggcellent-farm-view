@@ -8,7 +8,7 @@ export interface User {
   lastLogin: string
 }
 
-export type UserRole = "Admin" | "Farm Manager" | "Worker"
+export type UserRole = "Admin" | "Manager" | "Worker"
 
 export interface AuthState {
   user: User | null

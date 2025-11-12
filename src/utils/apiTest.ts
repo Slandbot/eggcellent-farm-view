@@ -40,7 +40,7 @@ export const testLogin = async (email: string, password: string) => {
 }
 
 // Helper function to test registration
-export const testRegister = async (name: string, email: string, password: string, role: 'Admin' | 'Farm Manager' | 'Worker') => {
+export const testRegister = async (name: string, email: string, password: string, role: 'Admin' | 'Manager' | 'Worker') => {
   try {
     console.log('Testing registration...')
     const user = await authService.register({ name, email, password, role })

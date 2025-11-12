@@ -19,9 +19,41 @@ export default function BirdsManagement() {
   const [filters, setFilters] = useState({ status: '', breed: '', search: '' })
   
   // API hooks
-  const { data: birdsData, loading: birdsLoading, refetch: refetchBirds } = useBirds(filters)
-  const { data: birdsStats, loading: statsLoading } = useBirdsStats()
+  const { data: birdsData, loading: birdsLoading, error: birdsError, refetch: refetchBirds } = useBirds(filters)
+  const { data: birdsStats, loading: statsLoading, error: statsError } = useBirdsStats()
   const { createBirdGroup, loading: actionLoading } = useBirdActions()
+
+  // Handle nested API response structure: { data: { data: [...] } }
+  let birds: any[] = []
+  if (birdsData) {
+    if (Array.isArray(birdsData)) {
+      birds = birdsData
+    } else if (typeof birdsData === 'object') {
+      // Handle nested structure: { data: [...] } or { data: { data: [...] } }
+      if ('data' in birdsData) {
+        const dataValue = (birdsData as any).data
+        if (Array.isArray(dataValue)) {
+          birds = dataValue
+        } else if (dataValue && typeof dataValue === 'object' && 'data' in dataValue) {
+          // Double nested: { data: { data: [...] } }
+          const nestedData = dataValue.data
+          if (Array.isArray(nestedData)) {
+            birds = nestedData
+          }
+        }
+      }
+    }
+  }
+  
+  // Debug: Log what we received
+  if (import.meta.env.DEV) {
+    console.log('[BirdsManagement] Raw birdsData:', birdsData)
+    console.log('[BirdsManagement] Raw birdsData type:', typeof birdsData, 'isArray:', Array.isArray(birdsData))
+    console.log('[BirdsManagement] Extracted birds count:', birds.length)
+    if (birds.length > 0) {
+      console.log('[BirdsManagement] First bird item:', birds[0])
+    }
+  }
   const [newBirdGroup, setNewBirdGroup] = useState({
     groupId: "",
     breed: "",
@@ -34,34 +66,53 @@ export default function BirdsManagement() {
   })
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Healthy": return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300"
-      case "Sick": return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
-      case "Quarantine": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
-      default: return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300"
+    const normalizedStatus = status?.toLowerCase() || ''
+    switch (normalizedStatus) {
+      case "healthy":
+      case "active":
+        return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300"
+      case "sick":
+      case "ill":
+      case "disease":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+      case "quarantine":
+      case "monitoring":
+      case "treatment":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+      default: 
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300"
     }
   }
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Healthy": return <Heart className="w-4 h-4" />
-      case "Sick": return <AlertTriangle className="w-4 h-4" />
-      case "Quarantine": return <AlertTriangle className="w-4 h-4" />
-      default: return null
+    const normalizedStatus = status?.toLowerCase() || ''
+    switch (normalizedStatus) {
+      case "healthy":
+      case "active":
+        return <Heart className="w-4 h-4" />
+      case "sick":
+      case "ill":
+      case "disease":
+      case "quarantine":
+      case "monitoring":
+      case "treatment":
+        return <AlertTriangle className="w-4 h-4" />
+      default: 
+        return null
     }
   }
 
   return (
-    <div className="mobile-safe bg-background flex">
+    <div className="mobile-safe bg-background flex h-screen overflow-hidden">
       <AppSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       
-      <div className="flex-1 flex flex-col mobile-content">
+      <div className="flex-1 flex flex-col mobile-content overflow-hidden">
         <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         
-        <main className="flex-1 responsive-container responsive-spacing mobile-content">
+        <main className="flex-1 responsive-container responsive-spacing mobile-content overflow-y-auto">
           <div className="responsive-flex items-start sm:items-center justify-between mb-6">
             <div className="flex-1">
-              <h1 className="responsive-title text-foreground">Birds Management</h1>
+              <h1 className="responsive-title text-foreground pt-10">Birds Management</h1>
               <p className="responsive-subtitle">Monitor and manage your flock health and performance</p>
             </div>
             <Button className="gap-2 w-full sm:w-auto" onClick={() => setAddBirdGroupDialogOpen(true)}>
@@ -78,8 +129,23 @@ export default function BirdsManagement() {
             </div>
           )}
 
+          {/* Error State */}
+          {(birdsError || statsError) && !birdsLoading && !statsLoading && (
+            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-destructive mb-1">Unable to load birds data</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {birdsError || statsError || 'An error occurred while loading data. Please try refreshing the page.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Stats Cards */}
-          {!statsLoading && (
+          {!statsLoading && birdsStats && (
             <div className="responsive-card-grid">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -87,8 +153,8 @@ export default function BirdsManagement() {
                   <Bird className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{birdsStats?.totalBirds || "2,450"}</div>
-                  <p className="text-xs text-muted-foreground">{birdsStats?.totalChange || "+12% from last month"}</p>
+                  <div className="text-2xl font-bold">{birdsStats.totalBirds ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">{birdsStats.totalChange ?? "No data"}</p>
                 </CardContent>
               </Card>
               
@@ -98,8 +164,8 @@ export default function BirdsManagement() {
                   <Heart className="h-4 w-4 text-emerald-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{birdsStats?.healthyBirds || "2,380"}</div>
-                  <p className="text-xs text-muted-foreground">{birdsStats?.healthyPercentage || "97.1%"} of flock</p>
+                  <div className="text-2xl font-bold">{birdsStats.healthyBirds ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">{birdsStats.healthyPercentage ? `${birdsStats.healthyPercentage} of flock` : "No data"}</p>
                 </CardContent>
               </Card>
               
@@ -109,8 +175,8 @@ export default function BirdsManagement() {
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{birdsStats?.sickBirds || "70"}</div>
-                  <p className="text-xs text-muted-foreground">{birdsStats?.sickPercentage || "2.9%"} of flock</p>
+                  <div className="text-2xl font-bold">{birdsStats.sickBirds ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">{birdsStats.sickPercentage ? `${birdsStats.sickPercentage} of flock` : "No data"}</p>
                 </CardContent>
               </Card>
               
@@ -120,8 +186,19 @@ export default function BirdsManagement() {
                   <Bird className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{birdsStats?.avgEggProduction || "264"}</div>
+                  <div className="text-2xl font-bold">{birdsStats.avgEggProduction ?? 0}</div>
                   <p className="text-xs text-muted-foreground">eggs per bird/year</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+          
+          {/* No Stats Data Message */}
+          {!statsLoading && !birdsStats && (
+            <div className="responsive-card-grid">
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground text-center">No statistics data available</p>
                 </CardContent>
               </Card>
             </div>
@@ -191,31 +268,59 @@ export default function BirdsManagement() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ) : birdsData && birdsData.length > 0 ? (
-                      birdsData.map((bird: any) => (
-                        <TableRow key={bird.id} className="mobile-table-row">
-                          <TableCell className="mobile-table-cell font-medium" data-label="Bird ID">{bird.id}</TableCell>
-                          <TableCell className="mobile-table-cell" data-label="Breed">{bird.breed}</TableCell>
-                          <TableCell className="mobile-table-cell" data-label="Age">{bird.age}</TableCell>
-                          <TableCell className="mobile-table-cell" data-label="Status">
-                            <Badge className={getStatusColor(bird.status)}>
-                              <span className="flex items-center gap-1">
-                                {getStatusIcon(bird.status)}
-                                {bird.status}
-                              </span>
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="mobile-table-cell" data-label="Eggs/Year">{bird.eggs || bird.eggProduction}</TableCell>
-                          <TableCell className="mobile-table-cell" data-label="Pen Location">{bird.pen}</TableCell>
-                          <TableCell className="mobile-table-cell" data-label="Actions">
-                            <Button variant="ghost" size="sm" className="w-full sm:w-auto">Edit</Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                    ) : birds.length > 0 ? (
+                      birds.map((bird: any) => {
+                        // Map API response fields to UI fields (handle multiple possible formats)
+                        // Supports: Bird interface (health, production, location) and alternative formats (status, eggs, pen)
+                        const status = bird.status || bird.health || 'Unknown'
+                        const production = bird.production || bird.eggs || bird.eggProduction || bird.eggProductionRate || '0'
+                        const location = bird.location || bird.pen || bird.penLocation || 'N/A'
+                        const groupId = bird.group || bird.groupId || bird.id || 'N/A'
+                        const age = bird.age || bird.ageWeeks || bird.ageInWeeks || 'N/A'
+                        const breed = bird.breed || bird.breedType || 'Unknown'
+                        const count = bird.count || bird.birdCount || bird.totalBirds || ''
+                        
+                        return (
+                          <TableRow key={bird.id || bird._id || groupId} className="mobile-table-row">
+                            <TableCell className="mobile-table-cell font-medium" data-label="Bird ID">
+                              {groupId}
+                              {count && ` (${count})`}
+                            </TableCell>
+                            <TableCell className="mobile-table-cell" data-label="Breed">{breed}</TableCell>
+                            <TableCell className="mobile-table-cell" data-label="Age">
+                              {typeof age === 'number' ? `${age} weeks` : age}
+                            </TableCell>
+                            <TableCell className="mobile-table-cell" data-label="Status">
+                              <Badge className={getStatusColor(status)}>
+                                <span className="flex items-center gap-1">
+                                  {getStatusIcon(status)}
+                                  {status}
+                                </span>
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="mobile-table-cell" data-label="Eggs/Year">
+                              {typeof production === 'number' ? production.toLocaleString() : production}
+                            </TableCell>
+                            <TableCell className="mobile-table-cell" data-label="Pen Location">{location}</TableCell>
+                            <TableCell className="mobile-table-cell" data-label="Actions">
+                              <Button variant="ghost" size="sm" className="w-full sm:w-auto">Edit</Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
                     ) : (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          No birds found. Try adjusting your filters or add a new bird group.
+                          {birdsError 
+                            ? 'Error loading birds. Please try again.'
+                            : 'No birds found. Try adjusting your filters or add a new bird group.'}
+                          {import.meta.env.DEV && (
+                            <div className="mt-2 text-xs text-muted-foreground">
+                              Debug: birdsData type: {typeof birdsData}, 
+                              isArray: {Array.isArray(birdsData) ? 'true' : 'false'},
+                              birds length: {birds.length}
+                            </div>
+                          )}
                         </TableCell>
                       </TableRow>
                     )}
