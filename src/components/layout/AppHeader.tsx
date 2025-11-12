@@ -25,9 +25,29 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const navigate = useNavigate()
   const { user, logout, switchRole, hasPermission } = useUserRole()
 
-  const handleRoleSwitch = (role: UserRole) => {
-    switchRole(role)
-    window.location.reload() // Refresh to update permissions
+  const handleLogout = async () => {
+    try {
+      await logout()
+      // Navigate to home - AppContent will show AuthPage if not authenticated
+      navigate('/')
+    } catch (error) {
+      console.error('Logout failed:', error)
+      // Even if logout fails, clear local state and redirect
+      // Navigate to home - AppContent will show AuthPage if not authenticated
+      navigate('/')
+    }
+  }
+
+  const handleRoleSwitch = async (role: UserRole) => {
+    try {
+      await switchRole(role)
+      window.location.reload() // Refresh to update permissions
+    } catch (error) {
+      console.error('Role switch failed:', error)
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : 'Failed to switch role. Please try again.'
+      alert(errorMessage) // Could be replaced with toast notification
+    }
   }
 
   return (
@@ -102,7 +122,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
               Settings
             </DropdownMenuItem>
             
-            {/* Role switching for demo purposes */}
+            {/* Role switching for demo purposes
             {hasPermission("manage_users") && (
               <>
                 <DropdownMenuSeparator />
@@ -111,19 +131,19 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
                   <Shield className="w-4 h-4 mr-2" />
                   Admin
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleRoleSwitch("Farm Manager")}>
+                <DropdownMenuItem onClick={() => handleRoleSwitch("Manager")}>
                   <Users className="w-4 h-4 mr-2" />
-                  Farm Manager
+                  Manager
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleRoleSwitch("Worker")}>
                   <User className="w-4 h-4 mr-2" />
                   Worker
                 </DropdownMenuItem>
               </>
-            )}
+            )} */}
             
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} className="text-destructive">
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive">
               <LogOut className="w-4 h-4 mr-2" />
               Logout
             </DropdownMenuItem>

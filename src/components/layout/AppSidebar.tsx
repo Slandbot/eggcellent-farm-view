@@ -26,6 +26,7 @@ const navigation = [
   { name: "Egg Collection", href: "/eggs", icon: Egg },
   { name: "Medicine & Vaccines", href: "/medicine", icon: Syringe },
   { name: "Reports", href: "/reports", icon: FileText },
+  { name: "Statistics", href: "/statistics", icon: BarChart3 },
   { name: "User Management", href: "/users", icon: Users },
   { name: "Profile", href: "/profile", icon: User },
 ]
@@ -58,7 +59,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
       {/* Sidebar */}
       <div
         className={cn(
-          "fixed left-0 top-0 z-50 h-full transform bg-card border-r border-border transition-all duration-300 ease-in-out lg:relative lg:translate-x-0",
+          "fixed left-0 top-0 z-50 h-screen transform bg-card border-r border-border transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 flex flex-col lg:sticky lg:top-0 lg:self-start",
           isOpen ? "translate-x-0" : "-translate-x-full",
           isCollapsed ? "w-16 lg:w-16" : "w-64"
         )}
@@ -124,7 +125,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
 
         {/* Navigation */}
         <nav className={cn(
-          "p-4 space-y-2 flex-1 overflow-y-auto",
+          "p-4 space-y-2 flex-1 overflow-y-auto min-h-0",
           isCollapsed && "px-2"
         )}>
           {filteredNavigation.map((item) => {
@@ -168,21 +169,28 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
 
         {/* User info */}
         <div className={cn(
-          "absolute bottom-0 left-0 right-0 border-t border-border bg-muted/30 transition-all duration-300",
+          "border-t border-border bg-muted/30 transition-all duration-300 flex-shrink-0",
           isCollapsed ? "p-2" : "p-4"
         )}>
           {isCollapsed ? (
             <div className="flex justify-center">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center"> 
                 <span className="text-xs font-medium text-primary-foreground">
                   {user?.name?.charAt(0) || 'U'}
                 </span>
               </div>
             </div>
           ) : (
-            <div className="text-center">
-              <p className="text-sm font-medium text-foreground">Green Valley Farm</p>
-              <p className="text-xs text-muted-foreground">{user?.role}: {user?.name}</p>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm">
+                <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <p className="font-medium text-foreground truncate">
+                  {user?.name || user?.email?.split('@')[0] || 'Farm Name'}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground truncate">
+                {user?.role ? `${user.role}: ` : ''}{user?.name || user?.email?.split('@')[0] || 'User'}
+              </p>
             </div>
           )}
         </div>

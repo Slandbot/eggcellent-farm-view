@@ -10,19 +10,18 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ProductionChart } from "@/components/dashboard/ProductionChart"
-import { Plus, Search, Egg, TrendingUp, Calendar, Scale } from "lucide-react"
-
-const collectionData = [
-  { id: "EC001", date: "2024-01-15", shift: "Morning", pen: "A1", quantity: 145, grade: "A", weight: "58g avg", collector: "John Doe" },
-  { id: "EC002", date: "2024-01-15", shift: "Evening", pen: "A1", quantity: 132, grade: "A", weight: "57g avg", collector: "Jane Smith" },
-  { id: "EC003", date: "2024-01-15", shift: "Morning", pen: "B1", quantity: 168, grade: "AA", weight: "61g avg", collector: "John Doe" },
-  { id: "EC004", date: "2024-01-15", shift: "Evening", pen: "B1", quantity: 155, grade: "A", weight: "59g avg", collector: "Mike Johnson" },
-  { id: "EC005", date: "2024-01-14", shift: "Morning", pen: "C1", quantity: 198, grade: "AA", weight: "62g avg", collector: "Sarah Lee" },
-]
+import { Plus, Search, Egg, TrendingUp, Calendar, Scale, AlertTriangle } from "lucide-react"
+import { useEggCollections, useEggStats, useEggActions } from "@/hooks/useApiData"
 
 export default function EggCollection() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [recordCollectionDialogOpen, setRecordCollectionDialogOpen] = useState(false)
+  const [filters, setFilters] = useState({ pen: '', grade: '', date: '', search: '' })
+  
+  // API hooks
+  const { data: collectionData, loading: collectionLoading, error: collectionError, refetch: refetchCollections } = useEggCollections(filters)
+  const { data: eggStats, loading: statsLoading, error: statsError } = useEggStats()
+  const { recordCollection, loading: actionLoading } = useEggActions()
   const [newCollection, setNewCollection] = useState({
     date: new Date().toISOString().split('T')[0],
     shift: "",
@@ -43,25 +42,77 @@ export default function EggCollection() {
     }
   }
 
-  const totalDaily = collectionData
-    .filter(item => item.date === "2024-01-15")
-    .reduce((sum, item) => sum + item.quantity, 0)
+  // Handle nested API response structure: { data: { data: [...] } }
+  let collections: any[] = []
+  if (collectionData) {
+    if (Array.isArray(collectionData)) {
+      collections = collectionData
+    } else if (typeof collectionData === 'object') {
+      // Handle nested structure: { data: [...] } or { data: { data: [...] } }
+      if ('data' in collectionData) {
+        const dataValue = (collectionData as any).data
+        if (Array.isArray(dataValue)) {
+          collections = dataValue
+        } else if (dataValue && typeof dataValue === 'object' && 'data' in dataValue) {
+          // Double nested: { data: { data: [...] } }
+          const nestedData = dataValue.data
+          if (Array.isArray(nestedData)) {
+            collections = nestedData
+          }
+        }
+      }
+    }
+  }
+  
+  // Debug: Log what we received
+  if (import.meta.env.DEV) {
+    console.log('[EggCollection] Raw collectionData:', collectionData)
+    console.log('[EggCollection] Raw collectionData type:', typeof collectionData, 'isArray:', Array.isArray(collectionData))
+    console.log('[EggCollection] Extracted collections count:', collections.length)
+    if (collections.length > 0) {
+      console.log('[EggCollection] First collection item:', collections[0])
+    }
+  }
+  
+  // Normalize collection items - handle different field names from API
+  const normalizedCollections = collections.map((item: any) => ({
+    id: item.id || '',
+    date: item.date || '',
+    shift: item.shift || '',
+    pen: item.pen || '',
+    quantity: item.quantity ?? item.collected ?? 0,
+    grade: item.grade || item.quality || 'A',
+    avgWeight: item.avgWeight || item.weight || '',
+    collector: item.collector || item.collectedBy || '',
+    notes: item.notes || '',
+    broken: item.broken || 0,
+    createdAt: item.createdAt || '',
+    updatedAt: item.updatedAt || ''
+  }))
 
-  const avgWeight = "59g"
-  const gradeAA = collectionData.filter(item => item.grade === "AA").length
-  const weeklyTotal = 4850
+  // Calculate today's date for daily total
+  const today = new Date().toISOString().split('T')[0]
+  const totalDaily = normalizedCollections
+    .filter(item => item.date === today)
+    .reduce((sum, item) => sum + (item.quantity || 0), 0)
+
+  // Calculate grade AA rate from normalized data
+  const gradeAACount = normalizedCollections.filter(item => item.grade === "AA").length
+  const gradeAARate = normalizedCollections.length > 0 
+    ? `${((gradeAACount / normalizedCollections.length) * 100).toFixed(0)}%`
+    : "0%"
 
   return (
-    <div className="mobile-safe bg-background flex">
+    <div className="mobile-safe bg-background flex h-screen overflow-hidden">
       <AppSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       
-      <div className="flex-1 flex flex-col mobile-content">
+      <div className="flex-1 flex flex-col mobile-content overflow-hidden">
         <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         
-        <main className="flex-1 p-3 sm:p-6 space-y-4 sm:space-y-6 mobile-content">
+        <main className="flex-1 p-3 sm:p-6 space-y-4 sm:space-y-6 mobile-content overflow-y-auto">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Egg Collection</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground pt-10">Egg Collection</h1>
               <p className="text-sm sm:text-base text-muted-foreground">Track daily egg collection and quality grading</p>
             </div>
             <Button className="gap-2 w-full sm:w-auto" onClick={() => setRecordCollectionDialogOpen(true)}>
@@ -70,52 +121,86 @@ export default function EggCollection() {
             </Button>
           </div>
 
+          {/* Loading State */}
+          {(collectionLoading || statsLoading) && (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="ml-2 text-muted-foreground">Loading egg collection data...</span>
+            </div>
+          )}
+
+          {/* Error State */}
+          {(collectionError || statsError) && !collectionLoading && !statsLoading && (
+            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-destructive mb-1">Unable to load egg collection data</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {collectionError || statsError || 'An error occurred while loading data. Please try again.'}
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      refetchCollections()
+                    }}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Stats Cards */}
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Today's Collection</CardTitle>
-                <Egg className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl sm:text-2xl font-bold">{totalDaily}</div>
-                <p className="text-xs text-muted-foreground">+5% from yesterday</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Week Total</CardTitle>
-                <TrendingUp className="h-4 w-4 text-emerald-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl sm:text-2xl font-bold">{weeklyTotal.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">+8% from last week</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Avg Weight</CardTitle>
-                <Scale className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl sm:text-2xl font-bold">{avgWeight}</div>
-                <p className="text-xs text-muted-foreground">Standard grade A</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Grade AA Rate</CardTitle>
-                <Calendar className="h-4 w-4 text-emerald-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl sm:text-2xl font-bold">68%</div>
-                <p className="text-xs text-muted-foreground">Premium quality</p>
-              </CardContent>
-            </Card>
-          </div>
+          {!statsLoading && (
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Today's Collection</CardTitle>
+                  <Egg className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl sm:text-2xl font-bold">{eggStats?.todayCollection ?? totalDaily}</div>
+                  <p className="text-xs text-muted-foreground">{eggStats?.todayChange || "+0% from yesterday"}</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Week Total</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl sm:text-2xl font-bold">{eggStats?.weeklyTotal?.toLocaleString() ?? "0"}</div>
+                  <p className="text-xs text-muted-foreground">{eggStats?.weeklyChange || "+0% from last week"}</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Avg Weight</CardTitle>
+                  <Scale className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl sm:text-2xl font-bold">{eggStats?.avgWeight || "N/A"}</div>
+                  <p className="text-xs text-muted-foreground">Standard grade A</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Grade AA Rate</CardTitle>
+                  <Calendar className="h-4 w-4 text-emerald-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl sm:text-2xl font-bold">{eggStats?.gradeAARate ?? gradeAARate}</div>
+                  <p className="text-xs text-muted-foreground">Premium quality</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Production Chart */}
           <Card>
@@ -140,10 +225,31 @@ export default function EggCollection() {
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input placeholder="Search collections..." className="pl-10" />
+                  <Input 
+                    placeholder="Search collections..." 
+                    className="pl-10" 
+                    value={filters.search}
+                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                  />
                 </div>
                 <div className="flex gap-2 sm:gap-3">
-                  <Button variant="outline" className="flex-1 sm:flex-none text-sm">Filter by Date</Button>
+                  <Select value={filters.grade || "all"} onValueChange={(value) => setFilters(prev => ({ ...prev, grade: value === "all" ? "" : value }))}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Grade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Grades</SelectItem>
+                      <SelectItem value="AA">Grade AA</SelectItem>
+                      <SelectItem value="A">Grade A</SelectItem>
+                      <SelectItem value="B">Grade B</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input 
+                    type="date" 
+                    className="w-40" 
+                    value={filters.date}
+                    onChange={(e) => setFilters(prev => ({ ...prev, date: e.target.value }))}
+                  />
                   <Button variant="outline" className="flex-1 sm:flex-none text-sm">Export Report</Button>
                 </div>
               </div>
@@ -164,22 +270,50 @@ export default function EggCollection() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {collectionData.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell className="font-medium whitespace-nowrap">{record.id}</TableCell>
-                          <TableCell className="whitespace-nowrap">{record.date}</TableCell>
-                          <TableCell className="whitespace-nowrap">{record.shift}</TableCell>
-                          <TableCell className="whitespace-nowrap">{record.pen}</TableCell>
-                          <TableCell className="font-medium whitespace-nowrap">{record.quantity}</TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            <Badge className={getGradeColor(record.grade)}>
-                              Grade {record.grade}
-                            </Badge>
+                      {collectionLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8">
+                            <div className="flex items-center justify-center">
+                              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                              Loading collections...
+                            </div>
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">{record.weight}</TableCell>
-                          <TableCell className="whitespace-nowrap">{record.collector}</TableCell>
                         </TableRow>
-                      ))}
+                      ) : normalizedCollections.length > 0 ? (
+                        normalizedCollections.map((record: any) => (
+                          <TableRow key={record.id || Math.random()}>
+                            <TableCell className="font-medium whitespace-nowrap">{record.id || 'N/A'}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {record.date ? new Date(record.date).toLocaleDateString() : 'N/A'}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">{record.shift || 'N/A'}</TableCell>
+                            <TableCell className="whitespace-nowrap">{record.pen || 'N/A'}</TableCell>
+                            <TableCell className="font-medium whitespace-nowrap">{record.quantity?.toLocaleString() || 0}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              <Badge className={getGradeColor(record.grade)}>
+                                Grade {record.grade || 'N/A'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">{record.avgWeight || 'N/A'}</TableCell>
+                            <TableCell className="whitespace-nowrap">{record.collector || 'N/A'}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                            {collectionError || statsError 
+                              ? 'Error loading collections. Please try again.'
+                              : 'No egg collections found. Try adjusting your filters or record a new collection.'}
+                            {import.meta.env.DEV && (
+                              <div className="mt-2 text-xs text-muted-foreground">
+                                Debug: collectionData type: {typeof collectionData}, 
+                                isArray: {Array.isArray(collectionData) ? 'true' : 'false'},
+                                collections length: {collections.length}
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -319,24 +453,30 @@ export default function EggCollection() {
               Cancel
             </Button>
             <Button 
-              onClick={() => {
-                // Here you would typically save the data
-                console.log('Recording collection:', newCollection)
-                setRecordCollectionDialogOpen(false)
-                setNewCollection({
-                  date: new Date().toISOString().split('T')[0],
-                  shift: "",
-                  pen: "",
-                  quantity: "",
-                  grade: "",
-                  avgWeight: "",
-                  collector: "",
-                  notes: ""
+              onClick={async () => {
+                const success = await recordCollection({
+                  ...newCollection,
+                  quantity: parseInt(newCollection.quantity)
                 })
+                if (success) {
+                  setRecordCollectionDialogOpen(false)
+                  setNewCollection({
+                    date: new Date().toISOString().split('T')[0],
+                    shift: "",
+                    pen: "",
+                    quantity: "",
+                    grade: "",
+                    avgWeight: "",
+                    collector: "",
+                    notes: ""
+                  })
+                  refetchCollections()
+                }
               }}
+              disabled={actionLoading}
               className="w-full sm:w-auto order-1 sm:order-2"
             >
-              Record Collection
+              {actionLoading ? "Recording..." : "Record Collection"}
             </Button>
           </DialogFooter>
         </DialogContent>
